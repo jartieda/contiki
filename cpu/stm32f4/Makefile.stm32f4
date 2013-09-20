@@ -1,0 +1,179 @@
+
+.SUFFIXES:
+
+define \n
+
+
+endef
+
+
+### Define the CPU directory
+CONTIKI_CPU=$(CONTIKI)/cpu/stm32f4
+
+### Define the source files we have in the STM32W port
+
+CONTIKI_CPU_DIRS = . dev hal simplemac hal/micro/cortexm3 hal/micro/cortexm3/stm32w108 lib/src/peripherals inc lib/inc/peripherals lib/inc/core lib/inc
+
+STM32W_C = leds-arch.c leds.c clock.c watchdog.c uart1.c uart1-putchar.c slip-uart1.c slip.c\
+		stm32w-radio.c stm32w-systick.c uip-arch.c rtimer-arch.c adc.c micro.c sleep.c \
+		micro-common.c micro-common-internal.c clocks.c mfg-token.c nvm.c flash.c rand.c system-timer.c \
+		main.c stm32f4xx_it.c system_stm32f4xx.c syscalls.c utils.c \
+		CC3000/cc3000_common.c CC3000/hci.c CC3000/nvmem.c CC3000/socket.c \
+		CC3000/evnt_handler.c CC3000/netapp.c CC3000/os.c CC3000/wlan.c CC3000/spi.c \
+		dcmi_ov2640.c camera_api.c
+
+
+STM32W_C += lib/startup_stm32f4xx.s # add startup file to build
+
+###################################################
+
+# Check for valid float argument
+# NOTE that you have to run make clan after
+# changing these as hardfloat and softfloat are not
+# binary compatible
+ifneq ($(FLOAT_TYPE), hard)
+ifneq ($(FLOAT_TYPE), soft)
+#override FLOAT_TYPE = hard
+override FLOAT_TYPE = soft
+endif
+endif
+
+###################################################
+
+
+ifdef ELF_LOADER
+ELFLOADER  = elfloader-arch.c symtab.c
+endif
+
+
+# .s and .s79 not specified here because in Makefile.include only .c and .S suffixes are replaced with .o.
+CONTIKI_TARGET_SOURCEFILES += $(STM32W_C) \
+                              $(SYSAPPS) $(ELFLOADER) \
+                              $(TARGETLIBS)
+
+CONTIKI_SOURCEFILES        += $(CONTIKI_TARGET_SOURCEFILES)
+
+ ifdef PRINTF_FLOAT
+ TARGET_LIBFILES = $(CONTIKI_CPU)/simplemac/library/simplemac-library-gnu.a $(CONTIKI_CPU)/hal/micro/cortexm3/e_stdio_thumb2.a 
+ else
+ TARGET_LIBFILES = $(CONTIKI_CPU)/simplemac/library/simplemac-library-gnu.a $(CONTIKI_CPU)/lib/e_stdio_intonly_thumb2.a
+ endif
+
+###################################################
+
+### Compiler definitions
+# GCC
+CC	 = $(BINPATH)arm-none-eabi-gcc
+LD       = $(BINPATH)arm-none-eabi-gcc
+AS	 = $(BINPATH)arm-none-eabi-gcc
+NM	 = $(BINPATH)arm-none-eabi-nm
+AR       = $(BINPATH)arm-none-eabi-ar
+OBJCOPY  = $(BINPATH)arm-none-eabi-objcopy
+STRIP    = $(BINPATH)arm-none-eabi-strip
+SIZE     = $(BINPATH)arm-none-eabi-size
+
+OPTI = -Os -ffunction-sections 
+
+CFLAGSNO = -mthumb -mthumb-interwork -mcpu=cortex-m4 -std=gnu99 -g -Wall -Wno-strict-aliasing -mlittle-endian -nostartfiles  \
+			-D __SOURCEFILE__=\"$*.c\" 
+			
+CFLAGS  += $(CFLAGSNO) $(OPTI)
+
+ASFLAGS = -mthumb -mthumb-interwork -mcpu=cortex-m4 -c -g -Wall -Os -ffunction-sections \
+	    -mlittle-endian -fshort-enums -x assembler-with-cpp -Wa,-EL
+
+ifeq ($(FLOAT_TYPE), hard)
+CFLAGS += -fsingle-precision-constant -Wdouble-promotion
+CFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=hard
+#CFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=softfp
+else
+CFLAGS += -msoft-float
+endif
+CFLAGS += -Iinc -Ilib -Ilib/inc 
+CFLAGS += -Ilib/inc/core -Ilib/inc/peripherals 
+
+ifndef CPU_LD_CONFIG
+CPU_LD_CONFIG=$(CONTIKI_CPU)/stm32_flash.ld
+endif # CPU_LD_CONFIG
+
+LDFLAGS += -mcpu=cortex-m3 \
+	    -mthumb  \
+	    -Wl,-T -Xlinker $(CPU_LD_CONFIG) \
+	    -Wl,-static \
+			-u Default_Handler \
+	    -nostartfiles \
+	    -Wl,-Map -Xlinker contiki-$(TARGET).map
+	    
+ifndef ELF_LOADER
+ # Do not use garbage collection when the elfloader is used.
+ LDFLAGS += -Wl,--gc-sections
+endif 
+ 
+SIZEFLAGS = -A
+OBJOPTS = -O binary
+
+
+
+
+ifdef COFFEE_ADDRESS
+ COFFEE = 1
+endif
+
+# Default values for coffee section start.
+ifndef COFFEE_ADDRESS
+ COFFEE_ADDRESS = 0x8010c00
+endif
+
+ifeq ($(COFFEE),1)
+ CONTIKI_TARGET_SOURCEFILES += cfs-coffee.c cfs-coffee-arch.c
+ CFLAGS += -DCOFFEE_ADDRESS=$(COFFEE_ADDRESS)
+ 
+ #If $make invokation passed starting address use phony target to force synchronization of source to .coffeefiles section
+ #Warning: recompilation will not be forced if the starting address is then dropped, with dire consequences:
+ # -->Source that uses COFFEE_FILES and read macros for conditional compilation will be left hanging!
+ # -->Object modules that used .coffeefiles will overlap the .data section.
+ # -->$make clean is safest.
+#ifeq ($(origin COFFEE_ADDRESS), command line)
+# ifeq ($(COFFEE_FILES), 2)      #safest to force recompilation even if eeprom address is changed, might have been switched from flash
+   .PHONY : coffee
+   coffee:
+   $(OBJECTDIR)/cfs-coffee-arch.o    : coffee      #cfs-coffee-arch uses COFFEE_FILES, COFFEE_ADDRESS
+   $(OBJECTDIR)/cfs-coffee.o         : coffee      #core routine requires recompilation
+
+else
+ # Coffee starts at the end of the flash, before NVM section.
+ COFFEE_ADDRESS = 0x801F800
+endif
+
+
+
+### Custom rules
+
+OBJECTDIR = obj_$(TARGET)
+
+ssubst = ${patsubst %.s,%.o,${patsubst %.s79,%.o,$(1)}}
+
+CONTIKI_OBJECTFILES += ${addprefix $(OBJECTDIR)/,${call ssubst, $(STM32W_S)}}
+
+vpath %.s79 $(CONTIKI_CPU)/hal/micro/cortexm3
+vpath %.s $(CONTIKI_CPU)/hal/micro/cortexm3
+
+CUSTOM_RULE_C_TO_OBJECTDIR_O = 1
+
+$(OBJECTDIR)/%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+CUSTOM_RULE_C_TO_CO = 1
+%.co: %.c
+	$(CC) $(CFLAGS) -DAUTOSTART_ENABLE $< -o $@
+
+$(OBJECTDIR)/%.o: %.s79
+	$(AS) $(ASFLAGS) -o $@ $<
+
+$(OBJECTDIR)/%.o: %.s
+	$(AS) $(ASFLAGS) -o $@ $<
+
+%.bin: %.$(TARGET)
+	$(OBJCOPY) $(OBJOPTS) $< $@
+
+	

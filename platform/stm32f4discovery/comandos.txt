@@ -1,0 +1,30 @@
+telnet localhost 4444
+reset halt
+flash probe 0 
+flash write_image erase ./build/stm32f4_sample.bin 0x08000000 
+reset run
+exit
+
+target remote localhost:3333
+monitor reset halt
+load
+
+
+nera
+
+consola 1
+
+cd /c/armgcc/projects/STM32F4_Sample/
+export PATH=7c7armgcc/build/bin:$PATH
+make
+openocd.exe -f ../../build/bin/stm32f4discovery.cfg
+
+consola 2
+
+cd /c/armgcc/build/bin
+telnet localhost 4444
+reset halt
+flash probe 0 
+flash write_image erase ./build/stm32f4_sample.bin 0x08000000 
+reset run
+exit
