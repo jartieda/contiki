@@ -44,44 +44,56 @@
 
 #include <stdio.h>
 #include "dev/watchdog.h"
-#include PLATFORM_HEADER
-#include "hal/error.h"
-#include "hal/hal.h"
+#include "stm32f4xx_conf.h"
+
 
 /*---------------------------------------------------------------------------*/
 void
 watchdog_init(void)
 {
+  /* WWDG configuration */
+  /* Enable WWDG clock */
+  RCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE);
+
+  /* WWDG clock counter = (PCLK1 (42MHz)/4096)/8 = 1281 Hz (~780 us)  */
+  WWDG_SetPrescaler(WWDG_Prescaler_8);
+
+  /* Set Window value to 80; WWDG counter should be refreshed only when the counter
+    is below 80 (and greater than 64) otherwise a reset will be generated */
+  WWDG_SetWindowValue(80);
+
 
 }
 /*---------------------------------------------------------------------------*/
 void
 watchdog_start(void)
 {
-  /* 
-   * We setup the watchdog to reset the device after 2.048 seconds,
-   * unless watchdog_periodic() is called.
-   */
-  halInternalEnableWatchDog();
+    /* Enable WWDG and set counter value to 127, WWDG timeout = ~780 us * 64 = 49.92 ms 
+     In this case the refresh window is: 
+           ~780 * (127-80) = 36.6ms < refresh window < ~780 * 64 = 49.9ms
+  */
+  WWDG_Enable(127);
+
 }
 /*---------------------------------------------------------------------------*/
 void
 watchdog_periodic(void)
 {
   /* This function is called periodically to restart the watchdog timer. */
-  halResetWatchdog();
+    /* Update WWDG counter */
+    WWDG_SetCounter(127);
 }
 /*---------------------------------------------------------------------------*/
 void
 watchdog_stop(void)
 {
-  halInternalDisableWatchDog(MICRO_DISABLE_WATCH_DOG_KEY);
+
 }
 /*---------------------------------------------------------------------------*/
 void
 watchdog_reboot(void)
 {
-  halReboot();
+
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

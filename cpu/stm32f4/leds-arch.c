@@ -1,5 +1,5 @@
 /**
- * \addtogroup mb851-platform
+ * \addtogroup stm32f4
  *
  * @{
  */
@@ -39,40 +39,62 @@
 * \file
 *			Leds.
 * \author
-*			Salvatore Pitrulli <salvopitru@users.sourceforge.net>
+*			Jorge Artieda
 */
 
-#include PLATFORM_HEADER
-#include BOARD_HEADER
+//#include PLATFORM_HEADER
+//#include BOARD_HEADER
 #include "contiki-conf.h"
 #include "dev/leds.h"
-#include "hal/micro/micro-common.h"
-#include "hal/micro/cortexm3/micro-common.h"
+#include "stm32f4xx_conf.h"
 
-#define LEDS_PORT *((volatile uint32_t *)(GPIO_PxOUT_BASE+(GPIO_Px_OFFSET*(LEDS_CONF_PORT/8))))
+//#include "hal/micro/micro-common.h"
+//#include "hal/micro/cortexm3/micro-common.h"
 
 /*---------------------------------------------------------------------------*/
 void
 leds_arch_init(void)
 {
-  halGpioConfig(PORTx_PIN(LEDS_CONF_PORT, LEDS_CONF_RED_PIN), GPIOCFG_OUT);
-  halGpioConfig(PORTx_PIN(LEDS_CONF_PORT, LEDS_CONF_GREEN_PIN), GPIOCFG_OUT);
-  LEDS_PORT |= (LEDS_CONF_RED | LEDS_CONF_GREEN);
+	GPIO_InitTypeDef  GPIO_InitStructure;
+	// GPIOD Periph clock enable
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+
+  // Configure PD12, PD14 and PD15 in output pushpull mode
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12 | GPIO_Pin_14| GPIO_Pin_15;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOD, &GPIO_InitStructure);
+
 }
 /*---------------------------------------------------------------------------*/
 unsigned char
 leds_arch_get(void)
 {
-  return ((LEDS_PORT & LEDS_CONF_RED) ? 0 : LEDS_RED) |
-      ((LEDS_PORT & LEDS_CONF_GREEN) ? 0 : LEDS_GREEN);
+  return GPIO_ReadOutputDataBit(GPIOD, GPIO_Pin_12)| GPIO_ReadOutputDataBit(GPIOD, GPIO_Pin_15)| GPIO_ReadOutputDataBit(GPIOD, GPIO_Pin_14);
+
 }
 /*---------------------------------------------------------------------------*/
 void
 leds_arch_set(unsigned char leds)
 {
-  LEDS_PORT = (LEDS_PORT & ~(LEDS_CONF_RED | LEDS_CONF_GREEN)) |
-      ((leds & LEDS_RED) ? 0 : LEDS_CONF_RED) |
-      ((leds & LEDS_GREEN) ? 0 : LEDS_CONF_GREEN);
+	if (leds & LEDS_RED){
+		GPIO_SetBits(GPIOD, GPIO_Pin_12);
+	}else{
+		GPIO_ResetBits(GPIOD, GPIO_Pin_12);	
+	}
+	if (leds & LEDS_GREEN){
+		GPIO_SetBits(GPIOD, GPIO_Pin_15);	
+	}else{
+		GPIO_ResetBits(GPIOD, GPIO_Pin_15);	
+	}
+	if (leds & LEDS_BLUE){
+		GPIO_SetBits(GPIOD, GPIO_Pin_14);
+	}else{
+		GPIO_ResetBits(GPIOD, GPIO_Pin_14);	
+	}
+	
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

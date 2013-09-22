@@ -13,9 +13,8 @@ CONTIKI_CPU=$(CONTIKI)/cpu/stm32f4
 ### Define the source files we have in the STM32W port
 
 CONTIKI_CPU_DIRS = . dev hal simplemac hal/micro/cortexm3 hal/micro/cortexm3/stm32w108 lib/src/peripherals inc lib/inc/peripherals lib/inc/core lib/inc
-
-STM32W_C = leds-arch.c leds.c clock.c watchdog.c uart1.c uart1-putchar.c slip-uart1.c slip.c\
-		stm32w-radio.c stm32w-systick.c uip-arch.c rtimer-arch.c adc.c micro.c sleep.c \
+ELIMINADOS =  uart1.c uart1-putchar.c slip-uart1.c slip.c stm32w-radio.c stm32w-systick.c
+STM32W_C = leds-arch.c leds.c clock.c watchdog.c uip-arch.c rtimer-arch.c adc.c micro.c sleep.c \
 		micro-common.c micro-common-internal.c clocks.c mfg-token.c nvm.c flash.c rand.c system-timer.c \
 		main.c stm32f4xx_it.c system_stm32f4xx.c syscalls.c utils.c \
 		CC3000/cc3000_common.c CC3000/hci.c CC3000/nvmem.c CC3000/socket.c \

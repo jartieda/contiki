@@ -42,21 +42,15 @@
 *			Salvatore Pitrulli <salvopitru@users.sourceforge.net>
 */
 
-#include PLATFORM_HEADER
 #include <stdio.h>
-#include "hal/error.h"
-#include "hal/hal.h"
-#include "dev/stm32w-systick.h"
 
 #include "contiki.h"
 #include "sys/clock.h"
 
-#include "uart1.h"
-#include "dev/leds.h"
-#include "dev/stm32w-radio.h"
-
 #define DEBUG DEBUG_NONE
 #include "net/uip-debug.h"
+
+#include "stm32f4xx_conf.h"
 
 /*--------------------------------------------------------------------------*/
 /* The value that will be load in the SysTick value register. */
@@ -66,9 +60,9 @@ static volatile clock_time_t count;
 static volatile unsigned long current_seconds = 0;
 static unsigned int second_countdown = CLOCK_SECOND;
 /*---------------------------------------------------------------------------*/
-void
-SysTick_Handler(void)
-{
+//void SysTick_Handler(void)
+void timing_handler() {
+
   count++;
   if(etimer_pending()) {
     etimer_request_poll();
@@ -84,13 +78,19 @@ SysTick_Handler(void)
 void
 clock_init(void)
 {
-  ATOMIC(
+ // ATOMIC(
     /* Counts the number of ticks. */
     count = 0;
-    SysTick_CLKSourceConfig(SysTick_CLKSource_HCLK);
-    SysTick_SetReload(RELOAD_VALUE);
-    SysTick_ITConfig(ENABLE);
-    SysTick_CounterCmd(SysTick_Counter_Enable);)
+    //SysTick_CLKSourceConfig(SysTick_CLKSource_HCLK);
+    //SysTick_SetReload(RELOAD_VALUE);
+    //SysTick_ITConfig(ENABLE);
+    //SysTick_CounterCmd(SysTick_Counter_Enable);)
+		// ---------- SysTick timer -------- //
+	if (SysTick_Config(SystemCoreClock / 1000)) {
+		// Capture error
+		while (1){};
+	}
+
 }
 /*---------------------------------------------------------------------------*/
 clock_time_t
