@@ -68,12 +68,12 @@ SIZE     = $(BINPATH)arm-none-eabi-size
 
 #OPTI = -Os -ffunction-sections 
 
-CFLAGSNO = -mthumb -mthumb-interwork -mcpu=cortex-m4 -std=gnu99 -g -Wall -Wno-strict-aliasing -mlittle-endian  \
+CFLAGSNO = -mthumb -mthumb-interwork -mcpu=cortex-m4 -std=gnu99 -g -Wall -Wno-strict-aliasing -mlittle-endian  -nostartfiles \
 			-D __SOURCEFILE__=\"$*.c\" 
 			
 CFLAGS  += $(CFLAGSNO) $(OPTI)
 
-ASFLAGS = -mthumb -mthumb-interwork -mcpu=cortex-m4 -c -g -Wall $(OPTI) \
+ASFLAGS = -mthumb -mthumb-interwork -mcpu=cortex-m4 -c -g -Wall -nostartfiles $(OPTI) \
 	    -mlittle-endian -fshort-enums -x assembler-with-cpp -Wa,-EL
 
 ifeq ($(FLOAT_TYPE), hard)
@@ -95,7 +95,7 @@ LDFLAGS += -Wall -g -std=gnu99 -mcpu=cortex-m4 \
 	    -T$(CPU_LD_CONFIG) \
 	     -msoft-float \
 		 -mthumb-interwork \
-		 -mlittle-endian 
+		 -mlittle-endian  -nostartfiles
 
 ifndef ELF_LOADER
  # Do not use garbage collection when the elfloader is used.
@@ -168,5 +168,11 @@ $(OBJECTDIR)/%.o: %.s
 
 %.bin: %.$(TARGET)
 	$(OBJCOPY) $(OBJOPTS) $< $@
+	@$(SIZE) $<
+	
+%.$(TARGET): %.co $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) contiki-$(TARGET).a $(OBJECTDIR)/symbols.o
+	$(LD) $(LDFLAGS) $(TARGET_STARTFILES) ${filter-out %.a,$^} -Wl,-\( ${filter %.a,$^} $(TARGET_LIBFILES) -Wl,-\) -o $@
+	@echo >> contiki-$(TARGET).map
+	@$(SIZE) $(SIZEFLAGS) $@ >> contiki-$(TARGET).map
 
 	

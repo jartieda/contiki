@@ -59,9 +59,17 @@
 static volatile clock_time_t count;
 static volatile unsigned long current_seconds = 0;
 static unsigned int second_countdown = CLOCK_SECOND;
+// Private variables
+volatile uint32_t time_var1, time_var2;
+
 /*---------------------------------------------------------------------------*/
 //void SysTick_Handler(void)
 void timing_handler() {
+	if (time_var1) {
+		time_var1--;
+	}
+
+	time_var2++;
 
   count++;
   if(etimer_pending()) {
@@ -129,6 +137,15 @@ unsigned long
 clock_seconds(void)
 {
   return current_seconds;
+}
+
+
+/*
+ * Delay a number of systick cycles (1ms)
+ */
+void Delay(volatile uint32_t nCount) {
+	time_var1 = nCount;
+	while(time_var1){};
 }
 /*--------------------------------------------------------------------------*/
 /** @} */
