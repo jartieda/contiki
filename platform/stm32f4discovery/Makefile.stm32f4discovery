@@ -1,7 +1,7 @@
 STM32TEST =  
 
 
-CONTIKI_TARGET_DIRS = .
+CONTIKI_TARGET_DIRS = . CC3000
 # Master clock frequency
 MCK=48000000
 CFLAGS+=-DAUTOSTART_ENABLE
@@ -11,7 +11,10 @@ CONTIKI_TARGET_MAIN = contiki-main.c
 endif
 
 CONTIKI_TARGET_SOURCEFILES += $(SENSORS) $(STEPPER_ROBOT) \
- $(CODEPROP_SOURCES) $(CONTIKI_TARGET_MAIN)
+ $(CODEPROP_SOURCES) $(CONTIKI_TARGET_MAIN) \
+	cc3000_common.c hci.c nvmem.c socket.c \
+	evnt_handler.c netapp.c os.c wlan.c spi.c \
+	dcmi_ov2640.c camera_api.c
 
 # include $(CONTIKI)/platform/$(TARGET)/apps/Makefile.apps
 

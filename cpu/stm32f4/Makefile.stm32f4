@@ -12,17 +12,12 @@ CONTIKI_CPU=$(CONTIKI)/cpu/stm32f4
 
 ### Define the source files we have in the STM32W port
 
-CONTIKI_CPU_DIRS = . dev hal simplemac hal/micro/cortexm3 hal/micro/cortexm3/stm32w108 lib/src/peripherals inc lib/inc/peripherals lib/inc/core lib/inc
-ELIMINADOS =  uart1.c uart1-putchar.c slip-uart1.c slip.c stm32w-radio.c stm32w-systick.c
-STM32W_C = leds-arch.c leds.c clock.c watchdog.c uip-arch.c rtimer-arch.c adc.c micro.c sleep.c \
-		micro-common.c micro-common-internal.c clocks.c mfg-token.c nvm.c flash.c rand.c system-timer.c \
-		main.c stm32f4xx_it.c system_stm32f4xx.c syscalls.c utils.c \
-		CC3000/cc3000_common.c CC3000/hci.c CC3000/nvmem.c CC3000/socket.c \
-		CC3000/evnt_handler.c CC3000/netapp.c CC3000/os.c CC3000/wlan.c CC3000/spi.c \
-		dcmi_ov2640.c camera_api.c
+CONTIKI_CPU_DIRS = . dev hal simplemac lib hal/micro/cortexm3 hal/micro/cortexm3/stm32w108 lib/src/peripherals inc lib/inc/peripherals lib/inc/core lib/inc
+ELIMINADOS =  uart1.c uart1-putchar.c slip-uart1.c slip.c stm32w-radio.c stm32w-systick.c adc.c micro.c micro-common.c micro-common-internal.c sleep.c clocks.c mfg-token.c nvm.c flash.c rand.c system-timer.c
+STM32W_C = leds-arch.c leds.c clock.c watchdog.c uip-arch.c rtimer-arch.c \
+		stm32f4xx_it.c system_stm32f4xx.c syscalls.c utils.c 
 
-
-STM32W_C += lib/startup_stm32f4xx.s # add startup file to build
+STM32W_S = startup_stm32f4xx.s # add startup file to build
 
 ###################################################
 
@@ -52,12 +47,12 @@ CONTIKI_TARGET_SOURCEFILES += $(STM32W_C) \
 
 CONTIKI_SOURCEFILES        += $(CONTIKI_TARGET_SOURCEFILES)
 
- ifdef PRINTF_FLOAT
- TARGET_LIBFILES = $(CONTIKI_CPU)/simplemac/library/simplemac-library-gnu.a $(CONTIKI_CPU)/hal/micro/cortexm3/e_stdio_thumb2.a 
- else
- TARGET_LIBFILES = $(CONTIKI_CPU)/simplemac/library/simplemac-library-gnu.a $(CONTIKI_CPU)/lib/e_stdio_intonly_thumb2.a
- endif
-
+# ifdef PRINTF_FLOAT
+# TARGET_LIBFILES = $(CONTIKI_CPU)/simplemac/library/simplemac-library-gnu.a $(CONTIKI_CPU)/hal/micro/cortexm3/e_stdio_thumb2.a 
+# else
+# TARGET_LIBFILES = $(CONTIKI_CPU)/simplemac/library/simplemac-library-gnu.a $(CONTIKI_CPU)/lib/e_stdio_intonly_thumb2.a
+# endif
+TARGET_LIBFILES = $(CONTIKI_CPU)/lib/libstm32f4.a
 ###################################################
 
 ### Compiler definitions
@@ -71,14 +66,14 @@ OBJCOPY  = $(BINPATH)arm-none-eabi-objcopy
 STRIP    = $(BINPATH)arm-none-eabi-strip
 SIZE     = $(BINPATH)arm-none-eabi-size
 
-OPTI = -Os -ffunction-sections 
+#OPTI = -Os -ffunction-sections 
 
-CFLAGSNO = -mthumb -mthumb-interwork -mcpu=cortex-m4 -std=gnu99 -g -Wall -Wno-strict-aliasing -mlittle-endian -nostartfiles  \
+CFLAGSNO = -mthumb -mthumb-interwork -mcpu=cortex-m4 -std=gnu99 -g -Wall -Wno-strict-aliasing -mlittle-endian  \
 			-D __SOURCEFILE__=\"$*.c\" 
 			
 CFLAGS  += $(CFLAGSNO) $(OPTI)
 
-ASFLAGS = -mthumb -mthumb-interwork -mcpu=cortex-m4 -c -g -Wall -Os -ffunction-sections \
+ASFLAGS = -mthumb -mthumb-interwork -mcpu=cortex-m4 -c -g -Wall $(OPTI) \
 	    -mlittle-endian -fshort-enums -x assembler-with-cpp -Wa,-EL
 
 ifeq ($(FLOAT_TYPE), hard)
@@ -95,14 +90,13 @@ ifndef CPU_LD_CONFIG
 CPU_LD_CONFIG=$(CONTIKI_CPU)/stm32_flash.ld
 endif # CPU_LD_CONFIG
 
-LDFLAGS += -mcpu=cortex-m3 \
+LDFLAGS += -Wall -g -std=gnu99 -mcpu=cortex-m4 \
 	    -mthumb  \
-	    -Wl,-T -Xlinker $(CPU_LD_CONFIG) \
-	    -Wl,-static \
-			-u Default_Handler \
-	    -nostartfiles \
-	    -Wl,-Map -Xlinker contiki-$(TARGET).map
-	    
+	    -T$(CPU_LD_CONFIG) \
+	     -msoft-float \
+		 -mthumb-interwork \
+		 -mlittle-endian 
+
 ifndef ELF_LOADER
  # Do not use garbage collection when the elfloader is used.
  LDFLAGS += -Wl,--gc-sections
@@ -164,7 +158,7 @@ $(OBJECTDIR)/%.o: %.c
 
 CUSTOM_RULE_C_TO_CO = 1
 %.co: %.c
-	$(CC) $(CFLAGS) -DAUTOSTART_ENABLE $< -o $@
+	$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
 
 $(OBJECTDIR)/%.o: %.s79
 	$(AS) $(ASFLAGS) -o $@ $<
