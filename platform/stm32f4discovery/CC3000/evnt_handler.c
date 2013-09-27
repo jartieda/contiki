@@ -211,7 +211,7 @@ unsigned char *
 hci_event_handler(void *pRetParams, unsigned char *from, unsigned char *fromlen)
 {
 	unsigned char *pucReceivedData, ucArgsize;
-        unsigned short usLength;
+    unsigned short usLength;
 	unsigned char *pucReceivedParams;
 	unsigned short usReceivedEventOpcode = 0;
 	unsigned long retValue32;

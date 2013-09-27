@@ -36,7 +36,9 @@
 #define	__WLAN_H__
 
 #include "cc3000_common.h"
-
+#include "contiki.h"
+#include "pt.h"
+struct pt;
 //*****************************************************************************
 //
 // If building with a C++ compiler, make all of the definitions in this header
@@ -130,14 +132,14 @@ extern void wlan_init(		tWlanCB	 	sWlanCB,
  * \warning     This function must be called after wlan_init and
  *              before any other wlan API
  */
-extern void wlan_start(unsigned short usPatchesAvailableAtHost);
+extern PT_THREAD( wlan_start(unsigned short usPatchesAvailableAtHost, struct pt *_pt));
 
 /**
  * \brief wlan stop
  *
  * Stop WLAN device by putting it into reset state. 
  *  
- * \return    None     
+ * \return    None
  *
  * \sa wlan_start 
  * \note        

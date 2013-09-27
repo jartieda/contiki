@@ -106,8 +106,6 @@ static void SimpleLink_Init_Start(unsigned short usPatchesAvailableAtHost) {
 	// IRQ Line asserted - start the read buffer size command
 	hci_command_send(HCI_CMND_SIMPLE_LINK_START, ptr,
 			WLAN_SL_INIT_START_PARAMS_LEN);
-
-	SimpleLinkWaitEvent(HCI_CMND_SIMPLE_LINK_START, 0);
 }
 
 /**
@@ -218,7 +216,9 @@ void SpiReceiveHandler(void *pvBuffer) {
  *              before any other wlan API
  */
 
-void wlan_start(unsigned short usPatchesAvailableAtHost) {
+PT_THREAD( wlan_start(unsigned short usPatchesAvailableAtHost, struct pt *pt) ){
+    PT_BEGIN(pt);
+
 	unsigned long ulSpiIRQState;
 
 	tSLInformation.NumberOfSentPackets = 0;
@@ -234,7 +234,6 @@ void wlan_start(unsigned short usPatchesAvailableAtHost) {
 	tSLInformation.usEventOrDataReceived = 0;
 
 	tSLInformation.pucReceivedData = 0;
-
 	//
 	// Allocate the memory for the RX/TX data transactions
 	//
@@ -276,10 +275,19 @@ void wlan_start(unsigned short usPatchesAvailableAtHost) {
 
 	SimpleLink_Init_Start(usPatchesAvailableAtHost);
 
+	// Configure EXTI Line0 (connected to PD8 pin) in interrupt mode
+	EXTILine0_Config();
+
+	PT_WAIT_UNTIL(pt,tSLInformation.usEventOrDataReceived != 0);
+
+	SimpleLinkWaitEvent(HCI_CMND_SIMPLE_LINK_START, 0);
+
 	// Read Buffer's size and finish
 	hci_command_send(HCI_CMND_READ_BUFFER_SIZE,
 			tSLInformation.pucTxCommandBuffer, 0);
+	PT_WAIT_UNTIL(pt,tSLInformation.usEventOrDataReceived != 0);
 	SimpleLinkWaitEvent(HCI_CMND_READ_BUFFER_SIZE, 0);
+	PT_END(pt);
 }
 
 /**

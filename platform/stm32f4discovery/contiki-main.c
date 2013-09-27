@@ -1,5 +1,7 @@
 #include "stm32f4xx_conf.h"
 //#include <nvic.h>
+#include "contiki.h"
+
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/process.h>
@@ -40,6 +42,8 @@ extern uint8_t frame_buffer[160*120];
 
 unsigned int idle_count = 0;
 
+struct pt wlan_pt;
+
 int
 main()
 {
@@ -50,7 +54,7 @@ main()
   process_init();
   process_start(&etimer_process, NULL);
   autostart_start(autostart_processes);
-
+  watchdog_init();
   init();
 	int i = 0;
 	for (i = 0 ; i<19200; i++)
@@ -82,12 +86,15 @@ main()
 	  Delay(200);
 
 	  DCMI_CaptureCmd(ENABLE);
+	  PT_INIT(&wlan_pt);
 
- 	wlan_start(0);
-	
+ 	wlan_start(0,&wlan_pt);
+ //	watchdog_start();
   //  printf("Processes running\n");
   while(1) {
+	 	wlan_start(0,&wlan_pt);
     do {
+   // 	watchdog_periodic();
     } while(process_run() > 0);
     idle_count++;
     /* Idle! */
@@ -187,18 +194,6 @@ void init() {
 	// Set DAC Channel1 DHR12L register
 	DAC_SetChannel1Data(DAC_Align_12b_R, 0);
 
-	// Configure EXTI Line0 (connected to PD8 pin) in interrupt mode
-	EXTILine0_Config();
-
-	// Configure wifi_pwr_en on PD9
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	GPIO_Init(GPIOD, &GPIO_InitStructure);
-	GPIO_ResetBits(GPIOD, GPIO_Pin_9);
 
 	// Initialize WiFi
 	wlan_init(fWlanCB,0,0,0,

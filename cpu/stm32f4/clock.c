@@ -147,5 +147,16 @@ void Delay(volatile uint32_t nCount) {
 	time_var1 = nCount;
 	while(time_var1){};
 }
+
+/**
+  * @brief  This function handles SysTick Handler.
+  * @param  None
+  * @retval None
+  */
+void SysTick_Handler(void)
+{
+	timing_handler();
+}
+
 /*--------------------------------------------------------------------------*/
 /** @} */

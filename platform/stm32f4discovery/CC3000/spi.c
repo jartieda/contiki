@@ -2,6 +2,10 @@
 #include <stdint.h>
 #include <stm32f4xx_spi.h>
 #include "stm32f4xx_conf.h"
+#include <contiki.h>
+
+/*---------------------------------------------------------------------------*/
+PROCESS(wifi_spi_process, "wifi spi process");
 
 #define SPI_BUFFER_SIZE         1700
 
@@ -18,112 +22,158 @@ void SpiOpen(void (*pfRxHandler))
 {
 	_pfRxHandler = pfRxHandler;
 
-	  GPIO_InitTypeDef GPIO_InitStructure;
+	GPIO_InitTypeDef GPIO_InitStructure;
 
-	  /*!< Enable the SPI clock */
-	  WIFI_SPI_CLK_INIT(WIFI_SPI_CLK, ENABLE);
+	/*!< Enable the SPI clock */
+	WIFI_SPI_CLK_INIT(WIFI_SPI_CLK, ENABLE);
 
-	  /*!< Enable GPIO clocks */
-	  RCC_AHB1PeriphClockCmd(WIFI_SPI_SCK_GPIO_CLK | WIFI_SPI_MISO_GPIO_CLK |
-	                         WIFI_SPI_MOSI_GPIO_CLK | WIFI_CS_GPIO_CLK, ENABLE);
+	/*!< Enable GPIO clocks */
+	RCC_AHB1PeriphClockCmd(WIFI_SPI_SCK_GPIO_CLK | WIFI_SPI_MISO_GPIO_CLK |
+						 WIFI_SPI_MOSI_GPIO_CLK | WIFI_CS_GPIO_CLK, ENABLE);
 
-	  /*!< SPI pins configuration *************************************************/
-      // enable peripheral clock
-	  RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
+	/*!< SPI pins configuration *************************************************/
+	// enable peripheral clock
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
 
-	  /*!< Connect SPI pins to AF5 */
-	  GPIO_PinAFConfig(WIFI_SPI_SCK_GPIO_PORT, WIFI_SPI_SCK_SOURCE, WIFI_SPI_SCK_AF);
-	  GPIO_PinAFConfig(WIFI_SPI_MISO_GPIO_PORT, WIFI_SPI_MISO_SOURCE, WIFI_SPI_MISO_AF);
-	  GPIO_PinAFConfig(WIFI_SPI_MOSI_GPIO_PORT, WIFI_SPI_MOSI_SOURCE, WIFI_SPI_MOSI_AF);
+	/*!< Connect SPI pins to AF5 */
+	GPIO_PinAFConfig(WIFI_SPI_SCK_GPIO_PORT, WIFI_SPI_SCK_SOURCE, WIFI_SPI_SCK_AF);
+	GPIO_PinAFConfig(WIFI_SPI_MISO_GPIO_PORT, WIFI_SPI_MISO_SOURCE, WIFI_SPI_MISO_AF);
+	GPIO_PinAFConfig(WIFI_SPI_MOSI_GPIO_PORT, WIFI_SPI_MOSI_SOURCE, WIFI_SPI_MOSI_AF);
 
-	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	  GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_DOWN;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_DOWN;
 
-	  /*!< SPI SCK pin configuration */
-	  GPIO_InitStructure.GPIO_Pin = WIFI_SPI_SCK_PIN;
-	  GPIO_Init(WIFI_SPI_SCK_GPIO_PORT, &GPIO_InitStructure);
+	/*!< SPI SCK pin configuration */
+	GPIO_InitStructure.GPIO_Pin = WIFI_SPI_SCK_PIN;
+	GPIO_Init(WIFI_SPI_SCK_GPIO_PORT, &GPIO_InitStructure);
 
-	  /*!< SPI MOSI pin configuration */
-	  GPIO_InitStructure.GPIO_Pin =  WIFI_SPI_MOSI_PIN;
-	  GPIO_Init(WIFI_SPI_MOSI_GPIO_PORT, &GPIO_InitStructure);
+	/*!< SPI MOSI pin configuration */
+	GPIO_InitStructure.GPIO_Pin =  WIFI_SPI_MOSI_PIN;
+	GPIO_Init(WIFI_SPI_MOSI_GPIO_PORT, &GPIO_InitStructure);
 
-	  /*!< SPI MISO pin configuration */
-	  GPIO_InitStructure.GPIO_Pin =  WIFI_SPI_MISO_PIN;
-	  GPIO_Init(WIFI_SPI_MISO_GPIO_PORT, &GPIO_InitStructure);
+	/*!< SPI MISO pin configuration */
+	GPIO_InitStructure.GPIO_Pin =  WIFI_SPI_MISO_PIN;
+	GPIO_Init(WIFI_SPI_MISO_GPIO_PORT, &GPIO_InitStructure);
 
-	  /*!< Configure WIFI Card CS pin in output pushpull mode ********************/
-	  GPIO_InitStructure.GPIO_Pin = WIFI_CS_PIN;
-	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-	  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	  GPIO_Init(WIFI_CS_GPIO_PORT, &GPIO_InitStructure);
+	/*!< Configure WIFI Card CS pin in output pushpull mode ********************/
+	GPIO_InitStructure.GPIO_Pin = WIFI_CS_PIN;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(WIFI_CS_GPIO_PORT, &GPIO_InitStructure);
 
 	SPI_InitTypeDef  SPI_InitStructure;
 
 
-	  SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
-	  SPI_InitStructure.SPI_Mode = SPI_Mode_Master;
-	  SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
-	  //configuration for cc3000 wifi
-	  SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
-	  SPI_InitStructure.SPI_CPHA = SPI_CPHA_2Edge;
-	  SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
-	  SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;
+	SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
+	SPI_InitStructure.SPI_Mode = SPI_Mode_Master;
+	SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
+	//configuration for cc3000 wifi
+	SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
+	SPI_InitStructure.SPI_CPHA = SPI_CPHA_2Edge;
+	SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
+	SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;
 
-	  SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
+	SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
 
-	  SPI_InitStructure.SPI_CRCPolynomial = 7;
-	  SPI_Init(WIFI_SPI, &SPI_InitStructure);
+	SPI_InitStructure.SPI_CRCPolynomial = 7;
+	SPI_Init(WIFI_SPI, &SPI_InitStructure);
 
-	  SPI_CalculateCRC(WIFI_SPI, DISABLE);
+	SPI_CalculateCRC(WIFI_SPI, DISABLE);
 
-	  SPI_Cmd(SPI2, ENABLE); // enable SPI2
-	  //TODO configure interrupt pin
+	SPI_Cmd(SPI2, ENABLE); // enable SPI2
 
+
+	// Configure wifi_pwr_en on PD9
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOD, &GPIO_InitStructure);
+	GPIO_SetBits(GPIOD, GPIO_Pin_9);
+
+	process_start(&wifi_spi_process, NULL);
 
 }
 /* The SPIWrite function transmits a given user buffer over the SPI.          */
 long SpiWrite(unsigned char *pUserBuffer, unsigned short usLength)
 {
+	 unsigned char ucPad = 0;
+
+	//
+	// Figure out the total length of the packet in order to figure out if there is padding or not
+	//
+	if(!(usLength & 0x0001))
+	{
+		ucPad++;
+	}
+
+	fWlanInterruptDisable();
 	WIFI_CS_LOW();
-	Delay(1);
+	if (pUserBuffer[6]==0&&pUserBuffer[7]==0x40)
+		Delay(1);
 	pUserBuffer[0]=0x01;
-	pUserBuffer[1]=(usLength & 0xff00) >> 8;
-	pUserBuffer[2]=usLength & 0xff;
+	pUserBuffer[1]=((usLength+ucPad) & 0xff00) >> 8;
+	pUserBuffer[2]=(usLength+ucPad) & 0xff;
 	pUserBuffer[3]=0;
 	pUserBuffer[4]=0;
+
 	long count=0;
 	for (int i = 0; i < 4; i++)
 	{
 		SpiSendByte((uint8_t)pUserBuffer[i]);
 		count++;
 	}
-	Delay(1);
+	if (pUserBuffer[6]==0&&pUserBuffer[7]==0x40)
+		Delay(1);
 	for (int i = 4; i< usLength+5; i++)
 	{
 		SpiSendByte((uint8_t)pUserBuffer[i]);
 		count++;
 	}
+	if (ucPad >0){
+		SpiSendByte(0);
+		count++;
+	}
+
 	WIFI_CS_HIGH();
+    EXTI_ClearITPendingBit(EXTI_Line8);
+	fWlanInterruptEnable();
 	return count;
 }
 
 /* The SPIWrite function transmits a given user buffer over the SPI.          */
 long SpiReceive(unsigned char *pUserBuffer)
 {
+	//disable interrrupt
+	fWlanInterruptDisable();
 	WIFI_CS_LOW();
 	//Delay(1);
 	long count=0;
-	for (int i = 0; i < 10; i++)
+	unsigned char lsb_size;
+	int size;
+	SpiSendByte(0x03);
+	SpiSendByte(0);
+	SpiSendByte(0);
+	size=SpiSendByte(0);
+	lsb_size=SpiSendByte(0);
+	size = (size << 8) + lsb_size;
+
+	for (int i = 0; i < size; i++)
 	{
 		pUserBuffer[i]= SpiSendByte(0);
 		count++;
 	}
-
 	WIFI_CS_HIGH();
+
+    EXTI_ClearITPendingBit(EXTI_Line8);
+	fWlanInterruptEnable();
+
 	return count;
 }
 
@@ -192,14 +242,7 @@ long fWlanReadInteruptPin(void)
 /* interrupt on the IRQ line of SPI                                           */
 void fWlanInterruptEnable(void)
 {
-	NVIC_InitTypeDef   NVIC_InitStructure;
-
-	/* Enable and set EXTI Line0 Interrupt to the lowest priority */
-	NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_Init(&NVIC_InitStructure);
+	EXTI->IMR |= EXTI_IMR_MR8;
 
 }
 
@@ -207,14 +250,8 @@ void fWlanInterruptEnable(void)
 /* interrupt on the IRQ line of SPI                                           */
 void fWlanInterruptDisable(void)
 {
-	NVIC_InitTypeDef   NVIC_InitStructure;
+	EXTI->IMR &= ~EXTI_IMR_MR8;
 
-	/* Enable and set EXTI Line0 Interrupt to the lowest priority */
-	NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = DISABLE;
-	NVIC_Init(&NVIC_InitStructure);
 }
 
 /* Callback provided during the wlan_init call and invoked to write a value   */
@@ -256,34 +293,52 @@ void EXTILine0_Config(void)
   SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOD, EXTI_PinSource8);
 
   /* Configure EXTI WiFi */
-  EXTI_InitStructure.EXTI_Line = EXTI_Line0;
+  EXTI_InitStructure.EXTI_Line = EXTI_Line8;
   EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-  EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;
+  EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
   EXTI_InitStructure.EXTI_LineCmd = ENABLE;
   EXTI_Init(&EXTI_InitStructure);
 
   /* Enable and set EXTI Line0 Interrupt to the lowest priority */
-  NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;
+  NVIC_InitStructure.NVIC_IRQChannel = EXTI9_5_IRQn;
   NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
   NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
 }
+
+/*---------------------------------------------------------------------------*/
+PROCESS_THREAD(wifi_spi_process, ev, data)
+{
+  int len =0;
+
+  PROCESS_BEGIN();
+
+  while(1){
+	  PROCESS_WAIT_EVENT();
+	  len = SpiReceive(wlan_rx_buffer);
+      SpiReceiveHandler(wlan_rx_buffer);
+
+  }
+//  printf("Hello, world\n");
+
+  PROCESS_END();
+}
+/*---------------------------------------------------------------------------*/
+
 /**
   * @brief  This function handles External line 0 interrupt request.
   * @param  None
   * @retval None
   */
-void EXTI0_IRQHandler(void)
+void EXTI9_5_IRQHandler(void)
 {
-  if(EXTI_GetITStatus(EXTI_Line0) != RESET)
+  if(EXTI_GetITStatus(EXTI_Line8) != RESET)
   {
     /* Set LED */
 	  GPIO_SetBits(GPIOE, GPIO_Pin_12);
-	  int len =0;
-	  len = SpiReceive(wlan_rx_buffer);
-	  SpiReceiveHandler(wlan_rx_buffer);
+	  process_poll(&wifi_spi_process);
     /* Clear the EXTI line 0 pending bit */
-    EXTI_ClearITPendingBit(EXTI_Line0);
+    EXTI_ClearITPendingBit(EXTI_Line8);
   }
 }
