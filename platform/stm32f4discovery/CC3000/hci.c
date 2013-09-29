@@ -74,11 +74,14 @@ hci_command_send(unsigned short usOpcode, unsigned char *pucBuff,
 	stream = UINT16_TO_STREAM(stream, usOpcode);
 	UINT8_TO_STREAM(stream, ucArgsLength);
 
-    //
-	// Update the opcode of the event we will be waiting for
-	//
-    SpiWrite(pucBuff, ucArgsLength + SIMPLE_LINK_HCI_CMND_HEADER_SIZE);
-
+	if (usOpcode == HCI_CMND_SIMPLE_LINK_START){
+		SpiWrite_Init(pucBuff, ucArgsLength + SIMPLE_LINK_HCI_CMND_HEADER_SIZE);
+	}
+	else{
+		//
+		// Update the opcode of the event we will be waiting for
+		SpiWrite(pucBuff, ucArgsLength + SIMPLE_LINK_HCI_CMND_HEADER_SIZE);
+	}
 
     return(0);
 }

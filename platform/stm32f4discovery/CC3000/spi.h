@@ -31,6 +31,15 @@
 #define WIFI_CS_GPIO_PORT                  GPIOB
 #define WIFI_CS_GPIO_CLK                   RCC_AHB1Periph_GPIOB
 
+#define WIFI_SPI_DMA                       DMA1
+#define WIFI_SPI_DMA_CLK                   RCC_AHB1Periph_DMA1
+#define WIFI_SPI_TX_DMA_CHANNEL            DMA_Channel_0
+#define WIFI_SPI_TX_DMA_STREAM             DMA1_Stream4
+#define WIFI_SPI_TX_DMA_FLAG_TCIF          DMA_FLAG_TCIF4
+#define WIFI_SPI_RX_DMA_CHANNEL            DMA_Channel_0
+#define WIFI_SPI_RX_DMA_STREAM             DMA1_Stream3
+#define WIFI_SPI_RX_DMA_FLAG_TCIF          DMA_FLAG_TCIF3
+
 /* Exported macro ------------------------------------------------------------*/
 /* Select WIFI: Chip Select pin low */
 #define WIFI_CS_LOW()       GPIO_ResetBits(WIFI_CS_GPIO_PORT, WIFI_CS_PIN)

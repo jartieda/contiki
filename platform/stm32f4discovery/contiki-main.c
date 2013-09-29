@@ -56,43 +56,43 @@ main()
   autostart_start(autostart_processes);
   watchdog_init();
   init();
-	int i = 0;
-	for (i = 0 ; i<19200; i++)
-		frame_buffer[i]=0;
+  int i = 0;
+  for (i = 0 ; i<19200; i++)
+      frame_buffer[i]=0;
 
-	  /* Initializes the DCMI interface (I2C and GPIO) used to configure the camera */
-	  OV2640_HW_Init();
-	  Delay(5);
-	  /* Read the OV9655/OV2640 Manufacturer identifier */
-	  //OV9655_ReadID(&OV9655_Camera_ID);
+  /* Initializes the DCMI interface (I2C and GPIO) used to configure the camera */
+  OV2640_HW_Init();
+  Delay(5);/*necessary for init camera */
+  /* Read the OV9655/OV2640 Manufacturer identifier */
+  OV2640_ReadID(&OV2640_Camera_ID);
 
-		  OV2640_ReadID(&OV2640_Camera_ID);
+  if(OV2640_Camera_ID.PIDH  == 0x26)
+  {
+	Camera = OV2640_CAMERA;
+	ValueMax = 2;
+	GPIO_SetBits(GPIOD, GPIO_Pin_12);
+    OV2640_Init(BMP_QQVGA);
+    OV2640_QQVGAConfig();
+    OV2640_BandWConfig(0x18);
+  }
 
-		if(OV2640_Camera_ID.PIDH  == 0x26)
-		  {
-			Camera = OV2640_CAMERA;
-			ValueMax = 2;
-			GPIO_SetBits(GPIOD, GPIO_Pin_12);
-  		    OV2640_Init(BMP_QQVGA);
-	        OV2640_QQVGAConfig();
-	        OV2640_BandWConfig(0x18);
-		  }
+  /* Enable DMA2 stream 1 and DCMI interface then start image capture */
+  DMA_Cmd(DMA2_Stream1, ENABLE);
+  DCMI_Cmd(ENABLE);
 
-	  /* Enable DMA2 stream 1 and DCMI interface then start image capture */
-	  DMA_Cmd(DMA2_Stream1, ENABLE);
-	  DCMI_Cmd(ENABLE);
+  /* Insert 100ms delay: wait 100ms */
+  Delay(200);
 
-	  /* Insert 100ms delay: wait 100ms */
-	  Delay(200);
+  DCMI_CaptureCmd(ENABLE);
 
-	  DCMI_CaptureCmd(ENABLE);
-	  PT_INIT(&wlan_pt);
 
- 	wlan_start(0,&wlan_pt);
- //	watchdog_start();
-  //  printf("Processes running\n");
+  //watchdog_start();
+
+  /* Initializate the WIFI */
+  PT_INIT(&wlan_pt);
+
   while(1) {
-	 	wlan_start(0,&wlan_pt);
+    wlan_start(0,&wlan_pt);
     do {
    // 	watchdog_periodic();
     } while(process_run() > 0);
@@ -140,7 +140,6 @@ void init() {
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOE, &GPIO_InitStructure);
 
-	// ------ UART ------ //
 
 	// Clock
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);

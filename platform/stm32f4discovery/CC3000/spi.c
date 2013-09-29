@@ -12,6 +12,12 @@ PROCESS(wifi_spi_process, "wifi spi process");
 
 uint8_t wlan_tx_buffer[SPI_BUFFER_SIZE];
 uint8_t wlan_rx_buffer[SPI_BUFFER_SIZE];
+int ubRxIndex=0;
+int ubTxIndex=0;
+int ubRxMax=0;
+int ubTxMax=0;
+uint8_t wifi_state=0;//0 tx, 1 rx header, 2 rx body;
+
 
 void (*_pfRxHandler)();
 /* The SpiOpen function is called from the wlan_start API function. The main  */
@@ -67,7 +73,6 @@ void SpiOpen(void (*pfRxHandler))
 
 	SPI_InitTypeDef  SPI_InitStructure;
 
-
 	SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
 	SPI_InitStructure.SPI_Mode = SPI_Mode_Master;
 	SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
@@ -84,8 +89,65 @@ void SpiOpen(void (*pfRxHandler))
 
 	SPI_CalculateCRC(WIFI_SPI, DISABLE);
 
+//	//Initialize DMA
+//	DMA_InitTypeDef DMA_InitStructure;
+//	/* Enable DMA clock */
+//	RCC_AHB1PeriphClockCmd(WIFI_SPI_DMA_CLK, ENABLE);
+//
+//	/* DMA configuration -------------------------------------------------------*/
+//	/* Deinitialize DMA Streams */
+//	DMA_DeInit(WIFI_SPI_TX_DMA_STREAM);
+//	DMA_DeInit(WIFI_SPI_RX_DMA_STREAM);
+//
+//	/* Configure DMA Initialization Structure */
+//	DMA_InitStructure.DMA_BufferSize = SPI_BUFFER_SIZE;
+//	DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
+//	DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_1QuarterFull;
+//	DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
+//	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
+//	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+//	DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
+//	DMA_InitStructure.DMA_PeripheralBaseAddr =(uint32_t) (&(WIFI_SPI->DR));
+//	DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+//	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
+//	DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+//	/* Configure TX DMA */
+//	DMA_InitStructure.DMA_Channel = WIFI_SPI_TX_DMA_CHANNEL;
+//	DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
+//	DMA_InitStructure.DMA_Memory0BaseAddr =(uint32_t)wlan_tx_buffer;
+//	DMA_Init(WIFI_SPI_TX_DMA_STREAM, &DMA_InitStructure);
+//	/* Configure RX DMA */
+//	DMA_InitStructure.DMA_Channel = WIFI_SPI_RX_DMA_CHANNEL;
+//	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
+//	DMA_InitStructure.DMA_Memory0BaseAddr =(uint32_t)wlan_rx_buffer;
+//	DMA_Init(WIFI_SPI_RX_DMA_STREAM, &DMA_InitStructure);
+//
+//	/* Enable DMA SPI TX Stream */
+//	DMA_Cmd(WIFI_SPI_TX_DMA_STREAM,ENABLE);
+//
+//	/* Enable DMA SPI RX Stream */
+//	DMA_Cmd(WIFI_SPI_RX_DMA_STREAM,ENABLE);
+//
+//	/* Enable SPI DMA TX Requsts */
+//	SPI_I2S_DMACmd(WIFI_SPI, SPI_I2S_DMAReq_Tx, ENABLE);
+//
+//	/* Enable SPI DMA RX Requsts */
+//	SPI_I2S_DMACmd(WIFI_SPI, SPI_I2S_DMAReq_Rx, ENABLE);
+
+	/* Enable the SPI2 */
 	SPI_Cmd(SPI2, ENABLE); // enable SPI2
 
+	/* Configure the Priority Group to 1 bit */
+	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+
+	NVIC_InitTypeDef NVIC_InitStructure;
+
+	/* Configure the SPI interrupt priority */
+	NVIC_InitStructure.NVIC_IRQChannel = SPI2_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
 
 	// Configure wifi_pwr_en on PD9
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
@@ -101,7 +163,7 @@ void SpiOpen(void (*pfRxHandler))
 
 }
 /* The SPIWrite function transmits a given user buffer over the SPI.          */
-long SpiWrite(unsigned char *pUserBuffer, unsigned short usLength)
+long SpiWrite_Init(unsigned char *pUserBuffer, unsigned short usLength)
 {
 	 unsigned char ucPad = 0;
 
@@ -140,11 +202,44 @@ long SpiWrite(unsigned char *pUserBuffer, unsigned short usLength)
 		SpiSendByte(0);
 		count++;
 	}
-
+//	while (SPI_I2S_GetFlagStatus(WIFI_SPI, SPI_I2S_FLAG_RXNE) == RESET);
+	Delay(10);
 	WIFI_CS_HIGH();
-    EXTI_ClearITPendingBit(EXTI_Line8);
+	EXTI_ClearITPendingBit(EXTI_Line8);
+
+	//enable EXIT_IRQ from CC3000
 	fWlanInterruptEnable();
+
 	return count;
+}
+
+/* The SPIWrite function transmits a given user buffer over the SPI.          */
+long SpiWrite(unsigned char *pUserBuffer, unsigned short usLength)
+{
+	 unsigned char ucPad = 0;
+	//
+	// Figure out the total length of the packet in order to figure out if there is padding or not
+	//
+	if(!(usLength & 0x0001))
+	{
+		ucPad++;
+	}
+
+	fWlanInterruptDisable();
+	WIFI_CS_LOW();
+	pUserBuffer[0]=0x01;
+	pUserBuffer[1]=((usLength+ucPad) & 0xff00) >> 8;
+	pUserBuffer[2]=(usLength+ucPad) & 0xff;
+	pUserBuffer[3]=0;
+	pUserBuffer[4]=0;
+	if (ucPad >0){
+		pUserBuffer[usLength+5]=0;
+	}
+	ubTxIndex = 0;
+	ubTxMax = usLength+ucPad+5;
+	SpiSendByte((uint8_t)pUserBuffer[0]);//first byte send int send the rest
+
+	return 0;//FIXME RETURN COUNT?
 }
 
 /* The SPIWrite function transmits a given user buffer over the SPI.          */
@@ -154,27 +249,30 @@ long SpiReceive(unsigned char *pUserBuffer)
 	fWlanInterruptDisable();
 	WIFI_CS_LOW();
 	//Delay(1);
-	long count=0;
-	unsigned char lsb_size;
-	int size;
-	SpiSendByte(0x03);
-	SpiSendByte(0);
-	SpiSendByte(0);
-	size=SpiSendByte(0);
-	lsb_size=SpiSendByte(0);
-	size = (size << 8) + lsb_size;
+	wlan_tx_buffer[0]=0x03;
+	wlan_tx_buffer[1]=0x0;
+	wlan_tx_buffer[2]=0x0;
+	wlan_tx_buffer[3]=0x0;
+	wlan_tx_buffer[4]=0x0;
+	ubRxMax=5;
+	ubTxMax=5;
+	ubTxIndex = 1;
+	ubRxIndex = 0;
+	wifi_state=1;//rx header
+	SpiSendByte(wlan_tx_buffer[0]);//send first next are sent on int
 
-	for (int i = 0; i < size; i++)
-	{
-		pUserBuffer[i]= SpiSendByte(0);
-		count++;
-	}
-	WIFI_CS_HIGH();
+	/* Enable the Rx buffer not empty interrupt */
+	SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_RXNE, ENABLE);
 
-    EXTI_ClearITPendingBit(EXTI_Line8);
-	fWlanInterruptEnable();
+	/* Enable the Tx buffer empty interrupt */
+	SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_TXE, ENABLE);
 
-	return count;
+//	WIFI_CS_HIGH();
+
+//    EXTI_ClearITPendingBit(EXTI_Line8);
+//	fWlanInterruptEnable();
+
+	return 0;//FIXME THIS RETURNED COUNT
 }
 
 /**
@@ -192,18 +290,82 @@ uint8_t SpiSendByte(uint8_t byte)
   SPI_I2S_SendData(WIFI_SPI, byte);
 
   /*!< Wait to receive a byte */
-  while (SPI_I2S_GetFlagStatus(WIFI_SPI, SPI_I2S_FLAG_RXNE) == RESET);
+  //while (SPI_I2S_GetFlagStatus(WIFI_SPI, SPI_I2S_FLAG_RXNE) == RESET);
 
   /*!< Return the byte read from the SPI bus */
-  return SPI_I2S_ReceiveData(WIFI_SPI);
+  //return SPI_I2S_ReceiveData(WIFI_SPI);
 }
 
 /* The SpiRead function is called as a result of activity on the IRQ line     */
 /* while the SPI is in IDLE state.                                            */
-void SPI_IRQ(void)
+void SPI2_IRQHandler(void)
 {
-	wlan_rx_buffer[0] = SpiSendByte(0);
-	(*_pfRxHandler)();
+
+  /* SPI in Receiver mode */
+  if (SPI_I2S_GetITStatus(WIFI_SPI, SPI_I2S_IT_RXNE) == SET)
+  {
+
+	if (ubRxIndex < ubRxMax && ubRxIndex < SPI_BUFFER_SIZE)
+	{
+	  /* Receive Transaction data */
+		wlan_rx_buffer[ubRxIndex++] = SPI_I2S_ReceiveData(WIFI_SPI);
+		if (wifi_state == 1 )//rx header
+		{
+			if(ubRxIndex == 5){
+				unsigned char lsb_size;
+				int size;
+				size=wlan_rx_buffer[3];
+				lsb_size=wlan_rx_buffer[4];
+				size = (size << 8) + lsb_size;
+
+				for (int i = 0; i < size; i++)
+				{
+					wlan_tx_buffer[i]= 0;
+				}
+				wifi_state=2; //rx body
+				ubTxMax = size;
+				ubTxIndex = 1 ;
+				ubRxMax = size + 5;
+				SpiSendByte(wlan_tx_buffer[0]); //sends first byte so next are sent by interrupt
+			}
+		}else if (wifi_state==2)//rx body
+		{
+			if (ubRxIndex == ubRxMax-1){ //end reception
+				WIFI_CS_HIGH();
+
+				EXTI_ClearITPendingBit(EXTI_Line8);
+				fWlanInterruptEnable();
+				//(*_pfRxHandler)();
+				process_poll(&wifi_spi_process);
+
+			}
+		}
+	}
+	else
+	{
+	  /* Disable the Rx buffer not empty interrupt */
+	  SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_RXNE, DISABLE);
+	}
+  }
+  /* SPI in Tramitter mode */
+  if (SPI_I2S_GetITStatus(WIFI_SPI, SPI_I2S_IT_TXE) == SET)
+  {
+	if (ubTxIndex < ubTxMax && ubTxIndex < SPI_BUFFER_SIZE)
+	{
+	  /* Send Transaction data */
+	  SPI_I2S_SendData(WIFI_SPI, wlan_tx_buffer[ubTxIndex++]);
+	}
+	else if (ubTxIndex == ubTxMax){//end of transsmision
+		WIFI_CS_HIGH();
+	    EXTI_ClearITPendingBit(EXTI_Line8);
+		fWlanInterruptEnable();
+	}else
+	{
+	  /* Disable the Tx buffer empty interrupt */
+	  SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_TXE, DISABLE);
+	}
+  }
+	//wlan_rx_buffer[0] = SpiSendByte(0);
 }
 /* The SPIClose function is called when the MCU decides to perform a shutdown */
 /* operation on the CC3000 device. The functionality of SPIClose is up to the */
@@ -310,13 +472,13 @@ void EXTILine0_Config(void)
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(wifi_spi_process, ev, data)
 {
-  int len =0;
+  //int len =0;
 
   PROCESS_BEGIN();
 
   while(1){
 	  PROCESS_WAIT_EVENT();
-	  len = SpiReceive(wlan_rx_buffer);
+	  //len = SpiReceive(wlan_rx_buffer);
       SpiReceiveHandler(wlan_rx_buffer);
 
   }
@@ -337,7 +499,7 @@ void EXTI9_5_IRQHandler(void)
   {
     /* Set LED */
 	  GPIO_SetBits(GPIOE, GPIO_Pin_12);
-	  process_poll(&wifi_spi_process);
+	  SpiReceive(wlan_rx_buffer);
     /* Clear the EXTI line 0 pending bit */
     EXTI_ClearITPendingBit(EXTI_Line8);
   }
