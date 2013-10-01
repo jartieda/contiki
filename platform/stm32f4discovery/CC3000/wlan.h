@@ -132,7 +132,8 @@ extern void wlan_init(		tWlanCB	 	sWlanCB,
  * \warning     This function must be called after wlan_init and
  *              before any other wlan API
  */
-extern PT_THREAD( wlan_start(unsigned short usPatchesAvailableAtHost, struct pt *_pt));
+//extern PT_THREAD( wlan_start(unsigned short usPatchesAvailableAtHost, struct pt *_pt));
+extern void wlan_start(unsigned short usPatchesAvailableAtHost );
 
 /**
  * \brief wlan stop

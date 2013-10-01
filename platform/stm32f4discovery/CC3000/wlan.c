@@ -216,8 +216,9 @@ void SpiReceiveHandler(void *pvBuffer) {
  *              before any other wlan API
  */
 
-PT_THREAD( wlan_start(unsigned short usPatchesAvailableAtHost, struct pt *pt) ){
-    PT_BEGIN(pt);
+//PT_THREAD( wlan_start(unsigned short usPatchesAvailableAtHost, struct pt *pt) ){
+void wlan_start(unsigned short usPatchesAvailableAtHost) {
+//    PT_BEGIN(pt);
 
 	unsigned long ulSpiIRQState;
 
@@ -278,16 +279,16 @@ PT_THREAD( wlan_start(unsigned short usPatchesAvailableAtHost, struct pt *pt) ){
 	// Configure EXTI Line0 (connected to PD8 pin) in interrupt mode
 	EXTILine0_Config();
 
-	PT_WAIT_UNTIL(pt,tSLInformation.usEventOrDataReceived != 0);
+	//PT_WAIT_UNTIL(pt,tSLInformation.usEventOrDataReceived != 0);
 
 	SimpleLinkWaitEvent(HCI_CMND_SIMPLE_LINK_START, 0);
 
 	// Read Buffer's size and finish
 	hci_command_send(HCI_CMND_READ_BUFFER_SIZE,
 			tSLInformation.pucTxCommandBuffer, 0);
-	PT_WAIT_UNTIL(pt,tSLInformation.usEventOrDataReceived != 0);
+//	PT_WAIT_UNTIL(pt,tSLInformation.usEventOrDataReceived != 0);
 	SimpleLinkWaitEvent(HCI_CMND_READ_BUFFER_SIZE, 0);
-	PT_END(pt);
+//	PT_END(pt);
 }
 
 /**

@@ -45,6 +45,7 @@
 #define WIFI_CS_LOW()       GPIO_ResetBits(WIFI_CS_GPIO_PORT, WIFI_CS_PIN)
 /* Deselect WIFI: Chip Select pin high */
 #define WIFI_CS_HIGH()      GPIO_SetBits(WIFI_CS_GPIO_PORT, WIFI_CS_PIN)
+#define WIFI_CS_CHECK()	    GPIO_ReadInputDataBit( WIFI_CS_GPIO_PORT, WIFI_CS_PIN)
 
 
 

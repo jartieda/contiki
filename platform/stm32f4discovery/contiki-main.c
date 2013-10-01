@@ -90,9 +90,10 @@ main()
 
   /* Initializate the WIFI */
   PT_INIT(&wlan_pt);
-
+  wlan_start(0);
+  wlan_connect (WLAN_SEC_WPA2 ,"wifi1",5,NULL,"smallsignals",12);
   while(1) {
-    wlan_start(0,&wlan_pt);
+//    wlan_start(0,&wlan_pt);
     do {
    // 	watchdog_periodic();
     } while(process_run() > 0);

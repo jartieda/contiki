@@ -16,7 +16,7 @@ int ubRxIndex=0;
 int ubTxIndex=0;
 int ubRxMax=0;
 int ubTxMax=0;
-uint8_t wifi_state=0;//0 tx, 1 rx header, 2 rx body;
+uint8_t wifi_state=3;//0 tx, 1 rx header, 2 rx body , 3 tx Init;
 
 
 void (*_pfRxHandler)();
@@ -159,6 +159,13 @@ void SpiOpen(void (*pfRxHandler))
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
 	GPIO_SetBits(GPIOD, GPIO_Pin_9);
 
+
+	/* Enable the Rx buffer not empty interrupt */
+	SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_RXNE, ENABLE);
+
+	/* Enable the Tx buffer empty interrupt */
+	SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_TXE, ENABLE);
+
 	process_start(&wifi_spi_process, NULL);
 
 }
@@ -176,6 +183,7 @@ long SpiWrite_Init(unsigned char *pUserBuffer, unsigned short usLength)
 	}
 
 	fWlanInterruptDisable();
+	//while(!WIFI_CS_CHECK()){};
 	WIFI_CS_LOW();
 	if (pUserBuffer[6]==0&&pUserBuffer[7]==0x40)
 		Delay(1);
@@ -226,6 +234,10 @@ long SpiWrite(unsigned char *pUserBuffer, unsigned short usLength)
 	}
 
 	fWlanInterruptDisable();
+	while(!(WIFI_CS_CHECK() && fWlanReadInteruptPin()))
+	{
+		Delay(1);
+	};
 	WIFI_CS_LOW();
 	pUserBuffer[0]=0x01;
 	pUserBuffer[1]=((usLength+ucPad) & 0xff00) >> 8;
@@ -235,9 +247,13 @@ long SpiWrite(unsigned char *pUserBuffer, unsigned short usLength)
 	if (ucPad >0){
 		pUserBuffer[usLength+5]=0;
 	}
-	ubTxIndex = 0;
+	ubTxIndex = 1;//index to 1 because I send first byte by hand
 	ubTxMax = usLength+ucPad+5;
+	ubRxIndex = 0;//index to 1 because I send first byte by hand
+	ubRxMax = usLength+ucPad+5;
+	wifi_state=0;
 	SpiSendByte((uint8_t)pUserBuffer[0]);//first byte send int send the rest
+	SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_TXE, ENABLE);
 
 	return 0;//FIXME RETURN COUNT?
 }
@@ -247,6 +263,7 @@ long SpiReceive(unsigned char *pUserBuffer)
 {
 	//disable interrrupt
 	fWlanInterruptDisable();
+
 	WIFI_CS_LOW();
 	//Delay(1);
 	wlan_tx_buffer[0]=0x03;
@@ -260,11 +277,6 @@ long SpiReceive(unsigned char *pUserBuffer)
 	ubRxIndex = 0;
 	wifi_state=1;//rx header
 	SpiSendByte(wlan_tx_buffer[0]);//send first next are sent on int
-
-	/* Enable the Rx buffer not empty interrupt */
-	SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_RXNE, ENABLE);
-
-	/* Enable the Tx buffer empty interrupt */
 	SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_TXE, ENABLE);
 
 //	WIFI_CS_HIGH();
@@ -289,11 +301,14 @@ uint8_t SpiSendByte(uint8_t byte)
   /*!< Send byte through the SPI1 peripheral */
   SPI_I2S_SendData(WIFI_SPI, byte);
 
+
+
   /*!< Wait to receive a byte */
   //while (SPI_I2S_GetFlagStatus(WIFI_SPI, SPI_I2S_FLAG_RXNE) == RESET);
 
   /*!< Return the byte read from the SPI bus */
   //return SPI_I2S_ReceiveData(WIFI_SPI);
+  return 0;
 }
 
 /* The SpiRead function is called as a result of activity on the IRQ line     */
@@ -327,39 +342,46 @@ void SPI2_IRQHandler(void)
 				ubTxIndex = 1 ;
 				ubRxMax = size + 5;
 				SpiSendByte(wlan_tx_buffer[0]); //sends first byte so next are sent by interrupt
+				SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_TXE, ENABLE);
+
 			}
 		}else if (wifi_state==2)//rx body
 		{
-			if (ubRxIndex == ubRxMax-1){ //end reception
+			if (ubRxIndex == ubRxMax){ //end reception
 				WIFI_CS_HIGH();
 
 				EXTI_ClearITPendingBit(EXTI_Line8);
 				fWlanInterruptEnable();
-				//(*_pfRxHandler)();
-				process_poll(&wifi_spi_process);
+				SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_TXE, DISABLE);
 
+				(*_pfRxHandler)(wlan_rx_buffer+5);
+				//process_poll(&wifi_spi_process);
 			}
+		}else if (ubTxIndex == ubTxMax &&ubRxIndex == ubRxMax && wifi_state == 0){//end of transsmision
+
+			WIFI_CS_HIGH();
+		    EXTI_ClearITPendingBit(EXTI_Line8);
+			fWlanInterruptEnable();
+			SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_TXE, DISABLE);
+
 		}
 	}
 	else
 	{
 	  /* Disable the Rx buffer not empty interrupt */
-	  SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_RXNE, DISABLE);
+		SPI_I2S_ReceiveData(WIFI_SPI);
+	  //SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_RXNE, DISABLE);
 	}
   }
   /* SPI in Tramitter mode */
   if (SPI_I2S_GetITStatus(WIFI_SPI, SPI_I2S_IT_TXE) == SET)
   {
-	if (ubTxIndex < ubTxMax && ubTxIndex < SPI_BUFFER_SIZE)
+	if ((ubTxIndex < ubTxMax && ubTxIndex < SPI_BUFFER_SIZE))//||wifi_state==1|| wifi_state==2)
 	{
 	  /* Send Transaction data */
 	  SPI_I2S_SendData(WIFI_SPI, wlan_tx_buffer[ubTxIndex++]);
 	}
-	else if (ubTxIndex == ubTxMax){//end of transsmision
-		WIFI_CS_HIGH();
-	    EXTI_ClearITPendingBit(EXTI_Line8);
-		fWlanInterruptEnable();
-	}else
+	else
 	{
 	  /* Disable the Tx buffer empty interrupt */
 	  SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_TXE, DISABLE);
