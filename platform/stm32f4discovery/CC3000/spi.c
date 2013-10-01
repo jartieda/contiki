@@ -233,11 +233,11 @@ long SpiWrite(unsigned char *pUserBuffer, unsigned short usLength)
 		ucPad++;
 	}
 
-	fWlanInterruptDisable();
 	while(!(WIFI_CS_CHECK() && fWlanReadInteruptPin()))
 	{
 		Delay(1);
 	};
+	fWlanInterruptDisable();
 	WIFI_CS_LOW();
 	pUserBuffer[0]=0x01;
 	pUserBuffer[1]=((usLength+ucPad) & 0xff00) >> 8;

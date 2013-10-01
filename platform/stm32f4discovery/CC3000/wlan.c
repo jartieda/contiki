@@ -396,7 +396,7 @@ long wlan_connect(unsigned long ulSecType, char *ssid, long ssid_len,
 	// Wait for command complete event
 	//
 	SimpleLinkWaitEvent(HCI_CMND_WLAN_CONNECT, &ret);
-	errno = ret;
+	//errno = ret;
 
 	return (ret);
 }
@@ -439,7 +439,7 @@ wlan_connect(char *ssid, long ssid_len)
 	// Wait for command complete event
 	//
 	SimpleLinkWaitEvent(HCI_CMND_WLAN_CONNECT, &ret);
-	errno = ret;
+	//errno = ret;
 
 	return(ret);
 }
@@ -469,7 +469,7 @@ long wlan_disconnect() {
 	// Wait for command complete event
 	//
 	SimpleLinkWaitEvent(HCI_CMND_WLAN_DISCONNECT, &ret);
-	errno = ret;
+	//errno = ret;
 
 	return (ret);
 }
