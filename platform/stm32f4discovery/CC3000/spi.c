@@ -5,7 +5,6 @@
 #include <contiki.h>
 
 /*---------------------------------------------------------------------------*/
-PROCESS(wifi_spi_process, "wifi spi process");
 
 #define SPI_BUFFER_SIZE         1700
 
@@ -165,8 +164,6 @@ void SpiOpen(void (*pfRxHandler))
 
 	/* Enable the Tx buffer empty interrupt */
 	SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_TXE, ENABLE);
-
-	process_start(&wifi_spi_process, NULL);
 
 }
 /* The SPIWrite function transmits a given user buffer over the SPI.          */
