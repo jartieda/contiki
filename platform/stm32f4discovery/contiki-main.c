@@ -17,8 +17,13 @@
 #include "utils.h"
 #include "CC3000/wlan.h"
 #include "CC3000/spi.h"
+#include "dht11.h"
 //#include "dcmi_ov9655.h"
 #include "dcmi_ov2640.h"
+
+PROCINIT(&etimer_process );
+
+SENSORS(&DHT11_sensor);
 
 //OV9655_IDTypeDef  OV9655_Camera_ID;
 OV2640_IDTypeDef  OV2640_Camera_ID;
@@ -27,6 +32,8 @@ extern Camera_TypeDef       Camera;
 extern ImageFormat_TypeDef  ImageFormat;
 extern __IO uint8_t         ValueMax;
 extern const uint8_t *      ImageForematArray[];
+
+uint32_t clocktime;
 
 //#define WIFI_BOARD
 #define CAMERA_BOARD
@@ -42,7 +49,6 @@ extern uint8_t frame_buffer[160*120];
 
 unsigned int idle_count = 0;
 
-struct pt wlan_pt;
 
 int
 main()
@@ -89,13 +95,28 @@ main()
   //watchdog_start();
 
   /* Initializate the WIFI */
-  PT_INIT(&wlan_pt);
   wlan_start(0);
   wlan_connect (WLAN_SEC_WPA2 ,"wifi1",5,NULL,"smallsignals",12);
+
+//  process_start(&wifi_spi_process, NULL);
+
+  process_start(&sensors_process,NULL);
+
   while(1) {
 //    wlan_start(0,&wlan_pt);
     do {
+		if (clocktime!=clock_seconds()) {
+			clocktime=clock_seconds();
+	    	if (clocktime%2==0){
+	    		GPIO_SetBits(GPIOD, GPIO_Pin_14);
+	    	}else{
+	    		GPIO_ResetBits(GPIOD, GPIO_Pin_14);
+
+	    	}
+		}
    // 	watchdog_periodic();
+		etimer_request_poll();
+
     } while(process_run() > 0);
     idle_count++;
     /* Idle! */
@@ -112,24 +133,22 @@ void init() {
 	DAC_InitTypeDef  DAC_InitStructure;
 
 	// ---------- SysTick timer -------- //
-	if (SysTick_Config(SystemCoreClock / 1000)) {
+	//if (SysTick_Config(SystemCoreClock / 1000)) {
 		// Capture error
-		while (1){};
-	}
+	//	while (1){};
+	//}
 
+	// LEDS
 	// GPIOD Periph clock enable
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-
-	// Configure PD12, PD13, PD14 and PD15 in output pushpull mode
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12 | GPIO_Pin_13| GPIO_Pin_14| GPIO_Pin_15;
+    // Configure PD12, PD14 and PD15 in output pushpull mode
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12 | GPIO_Pin_14| GPIO_Pin_15;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
-
-		GPIO_SetBits(GPIOD, GPIO_Pin_12);
-		GPIO_SetBits(GPIOD, GPIO_Pin_13);
+	GPIO_SetBits(GPIOD, GPIO_Pin_12);
 
 	// WIFI Leds Clock
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
@@ -143,7 +162,7 @@ void init() {
 
 
 	// Clock
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
+	//RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 
 	// IO
@@ -177,10 +196,10 @@ void init() {
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 
 	// Configuration
-	DAC_InitStructure.DAC_Trigger = DAC_Trigger_None;
+	/*DAC_InitStructure.DAC_Trigger = DAC_Trigger_None;
 	DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
 	DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
-	DAC_Init(DAC_Channel_1, &DAC_InitStructure);
+	DAC_Init(DAC_Channel_1, &DAC_InitStructure);*/
 
 	// IO
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
@@ -203,7 +222,7 @@ void init() {
 			fWriteWlanPin);
 
 	// Generate software interrupt: simulate a falling edge applied on  EXTI0 line
-	EXTI_GenerateSWInterrupt(EXTI_Line0);
+	//EXTI_GenerateSWInterrupt(EXTI_Line0);
 
 }
 
