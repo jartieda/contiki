@@ -43,8 +43,6 @@ uint32_t clocktime;
 // Private function prototypes
 void Delay(volatile uint32_t nCount);
 void init();
-void calculation_test();
-void dac_test();
 extern uint8_t frame_buffer[160*120];
 
 unsigned int idle_count = 0;
@@ -57,11 +55,12 @@ main()
 //  printf("Initialising\n");
   
   clock_init();
+  watchdog_init();
+  init();
   process_init();
   process_start(&etimer_process, NULL);
   autostart_start(autostart_processes);
-  watchdog_init();
-  init();
+
   int i = 0;
   for (i = 0 ; i<19200; i++)
       frame_buffer[i]=0;
@@ -80,17 +79,16 @@ main()
     OV2640_Init(BMP_QQVGA);
     OV2640_QQVGAConfig();
     OV2640_BandWConfig(0x18);
+
+    /* Enable DMA2 stream 1 and DCMI interface then start image capture */
+    DMA_Cmd(DMA2_Stream1, ENABLE);
+    DCMI_Cmd(ENABLE);
+
+    /* Insert 100ms delay: wait 100ms */
+    Delay(200);
+
+    DCMI_CaptureCmd(ENABLE);
   }
-
-  /* Enable DMA2 stream 1 and DCMI interface then start image capture */
-  DMA_Cmd(DMA2_Stream1, ENABLE);
-  DCMI_Cmd(ENABLE);
-
-  /* Insert 100ms delay: wait 100ms */
-  Delay(200);
-
-  DCMI_CaptureCmd(ENABLE);
-
 
   //watchdog_start();
 
@@ -132,13 +130,7 @@ void init() {
 	//USART_InitTypeDef USART_InitStructure;
 	DAC_InitTypeDef  DAC_InitStructure;
 
-	// ---------- SysTick timer -------- //
-	//if (SysTick_Config(SystemCoreClock / 1000)) {
-		// Capture error
-	//	while (1){};
-	//}
-
-	// LEDS
+	// DEBUG LEDS
 	// GPIOD Periph clock enable
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
     // Configure PD12, PD14 and PD15 in output pushpull mode
@@ -150,44 +142,16 @@ void init() {
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
 	GPIO_SetBits(GPIOD, GPIO_Pin_12);
 
-	// WIFI Leds Clock
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
-	// WIFI Leds
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 | GPIO_Pin_11| GPIO_Pin_12;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	GPIO_Init(GPIOE, &GPIO_InitStructure);
+	// State Leds Clock (only for Wifi BOARD)
+//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
+	// State Leds
+//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 | GPIO_Pin_11| GPIO_Pin_12;
+//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+//	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+//	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+//	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+//	GPIO_Init(GPIOE, &GPIO_InitStructure);
 
-
-	// Clock
-	//RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-
-	// IO
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_USART2);
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2);
-
-	// Conf
-/*	USART_InitStructure.USART_BaudRate = 115200;
-	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
-	USART_InitStructure.USART_StopBits = USART_StopBits_1;
-	USART_InitStructure.USART_Parity = USART_Parity_No;
-	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-	USART_InitStructure.USART_Mode = USART_Mode_Tx | USART_Mode_Rx;
-	USART_Init(USART2, &USART_InitStructure);
-
-	// Enable
-	USART_Cmd(USART2, ENABLE);
-*/
 
 	// ---------- DAC ---------- //
 
@@ -220,9 +184,6 @@ void init() {
 			fWlanInterruptEnable,
 			fWlanInterruptDisable,
 			fWriteWlanPin);
-
-	// Generate software interrupt: simulate a falling edge applied on  EXTI0 line
-	//EXTI_GenerateSWInterrupt(EXTI_Line0);
 
 }
 

@@ -90,5 +90,5 @@ void fWlanInterruptDisable(void);
 /* reset of the CC3000 device                                                 */
 void fWriteWlanPin(unsigned char val);
 
-/* Configures EXTI Line0 (connected to PD8 pin) in interrupt mode             */
-void EXTILine0_Config(void);
+/* Configures EXTI Line8 (connected to PD8 pin) in interrupt mode             */
+void EXTILine_Config(void);

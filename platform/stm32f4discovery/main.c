@@ -229,8 +229,8 @@ void init() {
 	// Set DAC Channel1 DHR12L register
 	DAC_SetChannel1Data(DAC_Align_12b_R, 0);
 
-	// Configure EXTI Line0 (connected to PD8 pin) in interrupt mode
-	EXTILine0_Config();
+	// Configure EXTI Line8 (connected to PD8 pin) in interrupt mode
+	EXTILine_Config();
 
 	// Configure wifi_pwr_en on PD9
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);

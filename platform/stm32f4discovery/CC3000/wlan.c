@@ -276,19 +276,15 @@ void wlan_start(unsigned short usPatchesAvailableAtHost) {
 
 	SimpleLink_Init_Start(usPatchesAvailableAtHost);
 
-	// Configure EXTI Line0 (connected to PD8 pin) in interrupt mode
-	EXTILine0_Config();
-
-	//PT_WAIT_UNTIL(pt,tSLInformation.usEventOrDataReceived != 0);
+	// Configure EXTI Line8 (connected to PD8 pin) in interrupt mode
+	EXTILine_Config();
 
 	SimpleLinkWaitEvent(HCI_CMND_SIMPLE_LINK_START, 0);
 
 	// Read Buffer's size and finish
 	hci_command_send(HCI_CMND_READ_BUFFER_SIZE,
 			tSLInformation.pucTxCommandBuffer, 0);
-//	PT_WAIT_UNTIL(pt,tSLInformation.usEventOrDataReceived != 0);
 	SimpleLinkWaitEvent(HCI_CMND_READ_BUFFER_SIZE, 0);
-//	PT_END(pt);
 }
 
 /**

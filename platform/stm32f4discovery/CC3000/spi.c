@@ -355,7 +355,6 @@ void SPI2_IRQHandler(void)
 				SPI_I2S_ITConfig(WIFI_SPI, SPI_I2S_IT_TXE, DISABLE);
 
 				(*_pfRxHandler)(wlan_rx_buffer+5);
-				//process_poll(&wifi_spi_process);
 			}
 		}else if (ubTxIndex == ubTxMax &&ubRxIndex == ubRxMax && wifi_state == 0){//end of transsmision
 
@@ -456,7 +455,7 @@ void fWriteWlanPin(unsigned char val)
   * @param  None
   * @retval None
   */
-void EXTILine0_Config(void)
+void EXTILine_Config(void)
 {
   EXTI_InitTypeDef   EXTI_InitStructure;
   GPIO_InitTypeDef   GPIO_InitStructure;
@@ -491,23 +490,6 @@ void EXTILine0_Config(void)
   NVIC_Init(&NVIC_InitStructure);
 }
 
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(wifi_spi_process, ev, data)
-{
-  //int len =0;
-
-  PROCESS_BEGIN();
-
-  while(1){
-	  PROCESS_WAIT_EVENT();
-	  //len = SpiReceive(wlan_rx_buffer);
-      SpiReceiveHandler(wlan_rx_buffer);
-
-  }
-//  printf("Hello, world\n");
-
-  PROCESS_END();
-}
 /*---------------------------------------------------------------------------*/
 
 /**
