@@ -20,6 +20,7 @@
 #include "dht11.h"
 //#include "dcmi_ov9655.h"
 #include "dcmi_ov2640.h"
+#include "socket.h"
 
 PROCINIT(&etimer_process );
 
@@ -100,6 +101,48 @@ main()
 
   process_start(&sensors_process,NULL);
 
+  int sd = -1;
+  int connected = -1;
+  sockaddr addr;
+  unsigned short port = 80;
+  char wifi_buff[] = "POST /index.php HTTP/1.1\
+Host: 192.168.1.2\
+User-Agent: my custom client v.1\
+Content-Type: application/octet-stream\
+Content-Length: 10\
+\
+1234567890\n";
+  int wifi_buff_leng = sizeof("POST /index.php HTTP/1.1\
+Host: 192.168.1.2\
+User-Agent: my custom client v.1\
+Content-Type: application/octet-stream\
+Content-Length: 10\
+\
+1234567890\n");
+/*  memcpy(wifi_buff, "POST /index.php HTTP/1.1\
+Host: 192.168.1.2\
+User-Agent: my custom client v.1\
+Content-Type: application/octet-stream\
+Content-Length: 10\
+\
+1234567890\n", wifi_buff_leng);*/
+  addr.sa_family = AF_INET;
+  // port
+  addr.sa_data[0] = (port & 0xFF00) >> 8;
+  addr.sa_data[1] = (port & 0x00FF);
+  //ip
+  addr.sa_data[5] = 192;
+  addr.sa_data[4] = 168;
+  addr.sa_data[3] = 1;
+  addr.sa_data[2] = 2;
+//  addr.sin_zero
+  sd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
+  connected = connect(sd,&addr,sizeof(addr));
+  if (connected == 0)
+  {
+	  GPIO_ResetBits(GPIOD, GPIO_Pin_12);
+	  send(sd, wifi_buff, wifi_buff_leng, 0);
+  }
   while(1) {
 //    wlan_start(0,&wlan_pt);
     do {
