@@ -111,9 +111,9 @@ HostFlowControlConsumeBuff(int sd)
         //
         if (tSLInformation.slTransmitDataError != 0)
         {
-            errno = tSLInformation.slTransmitDataError;
+            long ret = tSLInformation.slTransmitDataError;
             tSLInformation.slTransmitDataError = 0;
-            return errno;
+            return ret;
         }
 
         if(SOCKET_STATUS_ACTIVE != get_socket_active_status(sd))
@@ -174,7 +174,7 @@ socket(long domain, long type, long protocol)
     //
     // Process the event 
     //
-    errno = ret;
+    //errno = ret;
     
     set_socket_active_status(ret, SOCKET_STATUS_ACTIVE);
     
@@ -219,7 +219,7 @@ closesocket(long sd)
 	// Since we are in blocking state - wait for event complete
 	//
     SimpleLinkWaitEvent(HCI_CMND_CLOSE_SOCKET, &ret);
-    errno = ret;
+    //errno = ret;
 
     /* since 'close' call may result in either OK (and then it closed) or error - mark this socket as invalid */
     set_socket_active_status(sd, SOCKET_STATUS_INACTIVE);
@@ -311,8 +311,8 @@ accept(long sd, sockaddr *addr, socklen_t *addrlen)
 	// need specify return parameters!!!
 	memcpy(addr, &tAcceptReturnArguments.tSocketAddress, ASIC_ADDR_LEN);
 	*addrlen = ASIC_ADDR_LEN;
-    errno = tAcceptReturnArguments.iStatus; 
-    ret = errno;
+    ret = tAcceptReturnArguments.iStatus;
+    //ret = errno;
 
     /* if succeeded, iStatus = new socket descriptor. otherwise - error number (negative value ?) */
     if(M_IS_VALID_SD(ret))
@@ -388,7 +388,7 @@ bind(long sd, const sockaddr *addr, long addrlen)
 	//
 	SimpleLinkWaitEvent(HCI_CMND_BIND, &ret);
 
-	errno = ret;
+	//errno = ret;
   
     return(ret);
 }
@@ -443,7 +443,7 @@ listen(long sd, long backlog)
 	// Since we are in blocking state - wait for event complete
 	//
 	SimpleLinkWaitEvent(HCI_CMND_LISTEN, &ret);
-    errno = ret;
+    //errno = ret;
  
 
     return(ret);
@@ -475,11 +475,11 @@ gethostbyname(char * hostname, unsigned short usNameLen, unsigned long* out_ip_a
     tBsdGethostbynameParams ret;
     unsigned char *ptr, *args;
     
-    errno = EFAIL;
+    long ret_= EFAIL;
 
 	if (usNameLen > HOSTNAME_MAX_LENGTH)
 	{
-        return errno;
+        return ret_;
 	}
 	
     ptr = tSLInformation.pucTxCommandBuffer;
@@ -502,12 +502,12 @@ gethostbyname(char * hostname, unsigned short usNameLen, unsigned long* out_ip_a
 	//
 	SimpleLinkWaitEvent(HCI_EVNT_BSD_GETHOSTBYNAME, &ret);
 	
-    errno = ret.retVal;
+    ret_= ret.retVal;
     
 
     (*((long*)out_ip_addr)) = ret.outputAddress;
 
-    return (errno);
+    return (ret_);
 
 }
 #endif
@@ -581,7 +581,7 @@ connect(long sd, const sockaddr *addr, long addrlen)
 	//
 	SimpleLinkWaitEvent(HCI_CMND_CONNECT, &ret);
 	
-    errno = ret;
+    //errno = ret;
 
     return((long)ret);
 }
@@ -710,7 +710,7 @@ select(long nfds, fd_set2 *readsds, fd_set2 *writesds, fd_set2 *exceptsds,
 	}
 	else
 	{
-    	  errno = tParams.iStatus;
+    	  //errno = tParams.iStatus;
           return(-1);
 	}
 }
@@ -797,7 +797,7 @@ setsockopt(long sd, long level, long optname, const void *optval, socklen_t optl
     }
 	else
 	{
-		errno = ret;
+		//errno = ret;
 		return (-1);
 	}
 }
@@ -882,7 +882,7 @@ getsockopt (long sd, long level, long optname, void *optval, socklen_t *optlen)
     }
 	else
 	{
-		errno = tRetParams.iStatus;
+		//errno = tRetParams.iStatus;
 		return (-1);
 	}
 }
@@ -946,7 +946,7 @@ simple_link_recv(long sd, void *buf, long len, long flags, sockaddr *from,
 		SimpleLinkWaitData(buf, (unsigned char *)from, (unsigned char *)fromlen);
     }
 
-    errno = tSocketReadEvent.iNumberOfBytes;
+    //errno = tSocketReadEvent.iNumberOfBytes;
 
     return(tSocketReadEvent.iNumberOfBytes);
 }

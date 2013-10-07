@@ -103,9 +103,17 @@ main()
   process_start(&sensors_process,NULL);
 
   int sd = -1;
+  Delay(1100);
+  sd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
+  if (sd != -1)
+  {
+	  GPIO_SetBits(GPIOD, GPIO_Pin_14);
+  }
+
+  Delay(5);
   int connected = -1;
   sockaddr addr;
-  unsigned short port = 80;
+  unsigned short port = 81;
   char wifi_buff[] = "POST /index.php HTTP/1.1\
 Host: 192.168.1.2\
 User-Agent: my custom client v.1\
@@ -137,7 +145,7 @@ Content-Length: 10\
   addr.sa_data[3] = 1;
   addr.sa_data[2] = 2;
 //  addr.sin_zero
-  sd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
+
   connected = connect(sd,&addr,sizeof(addr));
   if (connected == 0)
   {
@@ -150,9 +158,9 @@ Content-Length: 10\
 		if (clocktime!=clock_seconds()) {
 			clocktime=clock_seconds();
 	    	if (clocktime%2==0){
-	    		GPIO_SetBits(GPIOD, GPIO_Pin_14);
+//	    		GPIO_SetBits(GPIOD, GPIO_Pin_14);
 	    	}else{
-	    		GPIO_ResetBits(GPIOD, GPIO_Pin_14);
+//	    		GPIO_ResetBits(GPIOD, GPIO_Pin_14);
 
 	    	}
 		}
