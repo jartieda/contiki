@@ -18,13 +18,14 @@
 #include "CC3000/wlan.h"
 #include "CC3000/spi.h"
 #include "dht11.h"
+#include "windsensor.h"
 //#include "dcmi_ov9655.h"
 #include "dcmi_ov2640.h"
 #include "socket.h"
 
 PROCINIT(&etimer_process );
 
-SENSORS(&DHT11_sensor);
+SENSORS(&DHT11_sensor, &wind_sensor);
 
 //OV9655_IDTypeDef  OV9655_Camera_ID;
 OV2640_IDTypeDef  OV2640_Camera_ID;
@@ -194,32 +195,6 @@ void init() {
 //	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
 //	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 //	GPIO_Init(GPIOE, &GPIO_InitStructure);
-
-
-	// ---------- DAC ---------- //
-
-	// Clock
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-
-	// Configuration
-	/*DAC_InitStructure.DAC_Trigger = DAC_Trigger_None;
-	DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
-	DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
-	DAC_Init(DAC_Channel_1, &DAC_InitStructure);*/
-
-	// IO
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-	// Enable DAC Channel1
-	DAC_Cmd(DAC_Channel_1, ENABLE);
-
-	// Set DAC Channel1 DHR12L register
-	DAC_SetChannel1Data(DAC_Align_12b_R, 0);
-
 
 	// Initialize WiFi
 	wlan_init(fWlanCB,0,0,0,
