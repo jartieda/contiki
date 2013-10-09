@@ -27,6 +27,8 @@ PROCINIT(&etimer_process );
 
 SENSORS(&DHT11_sensor, &wind_sensor);
 
+PROCESS(wifi_client_process, "wifi_client_process");
+
 //OV9655_IDTypeDef  OV9655_Camera_ID;
 OV2640_IDTypeDef  OV2640_Camera_ID;
 
@@ -100,71 +102,15 @@ main()
   wlan_start(0);
   wlan_connect (WLAN_SEC_WPA2 ,"wifi1",5,NULL,"smallsignals",12);
 
-//  process_start(&wifi_spi_process, NULL);
-
-  process_start(&sensors_process,NULL);
-
-  int sd = -1;
   while(wifi_dhcp == 0){
 	  Delay(100);
   }
-  sd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
-  if (sd != -1)
-  {
-	  GPIO_SetBits(GPIOD, GPIO_Pin_14);
-  }
 
-  Delay(5);
-  int connected = -1;
-  sockaddr addr;
-  unsigned short port = 81;
-  char wifi_buff[] = "POST /recibeimg.php HTTP/1.1\n\
-Host: 192.168.1.2\n\
-User-Agent: my custom client v.1\n\
-Content-Type: application/octet-stream\n\
-Content-Length: 38400\n\
-\n";
-  int wifi_buff_leng = sizeof("POST /recibeimg.php HTTP/1.1\n\
-Host: 192.168.1.2\n\
-User-Agent: my custom client v.1\n\
-Content-Type: application/octet-stream\n\
-Content-Length: 38400\n\
-\n");
-/*  memcpy(wifi_buff, "POST /index.php HTTP/1.1\
-Host: 192.168.1.2\
-User-Agent: my custom client v.1\
-Content-Type: application/octet-stream\
-Content-Length: 10\
-\
-1234567890\n", wifi_buff_leng);*/
-  addr.sa_family = AF_INET;
-  // port
-  addr.sa_data[0] = (port & 0xFF00) >> 8;
-  addr.sa_data[1] = (port & 0x00FF);
-  //ip
-  addr.sa_data[2] = 192;
-  addr.sa_data[3] = 168;
-  addr.sa_data[4] = 1;
-  addr.sa_data[5] = 2;
-//  addr.sin_zero
+  process_start(&sensors_process,NULL);
 
-  connected = connect(sd,&addr,sizeof(addr));
-  if (connected == 0)
-  {
-	  GPIO_ResetBits(GPIOD, GPIO_Pin_12);
-	  send(sd, wifi_buff, wifi_buff_leng, 0);
-	  Delay(2000);
-	  for (int ipkg = 0; ipkg < 32; ipkg++){//16 = 160 *120 /1200 -> hago packetes de 1200
-		  send(sd, frame_buffer+(ipkg*1200),1200, 0);
-		  Delay(2000);
-		  while(tSLInformation.usNumberOfFreeBuffers==0)
-		  {
-			  Delay(100);
-		  }
-	  }
-  }
+  process_start(&wifi_client_process, NULL);
+
   while(1) {
-//    wlan_start(0,&wlan_pt);
     do {
 		if (clocktime!=clock_seconds()) {
 			clocktime=clock_seconds();
@@ -234,5 +180,78 @@ void _init() {
 
 }
 
+PROCESS_THREAD(wifi_client_process, ev, data)
+{
+  static struct etimer timer_send_image;
+  static struct etimer timer_send_packet;
+  static int sd;
+  static int connected;
+  static sockaddr addr;
+  static unsigned short port;
+  static int ipkg;
+  char wifi_buff[] = "POST /recibeimg.php HTTP/1.1\n\
+Host: 192.168.1.2\n\
+User-Agent: my custom client v.1\n\
+Content-Type: application/octet-stream\n\
+Content-Length: 38400\n\
+\n";
+  int wifi_buff_leng = sizeof("POST /recibeimg.php HTTP/1.1\n\
+Host: 192.168.1.2\n\
+User-Agent: my custom client v.1\n\
+Content-Type: application/octet-stream\n\
+Content-Length: 38400\n\
+\n");
+
+  PROCESS_BEGIN();
+  sd = -1;
+  connected = -1;
+  addr.sa_family = AF_INET;
+  // port
+  port = 81;
+  addr.sa_data[0] = (port & 0xFF00) >> 8;
+  addr.sa_data[1] = (port & 0x00FF);
+  //ip
+  addr.sa_data[2] = 192;
+  addr.sa_data[3] = 168;
+  addr.sa_data[4] = 1;
+  addr.sa_data[5] = 2;
+
+  while (1)
+  {
+      etimer_set(&timer_send_image, CLOCK_SECOND * 15);
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_image));
+      sd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
+      if (sd != -1)
+      {
+          connected = connect(sd,&addr,sizeof(addr));
+          if (connected == 0)
+          {
+              GPIO_SetBits(GPIOD, GPIO_Pin_14);
+              //header
+              send(sd, wifi_buff, wifi_buff_leng, 0);
+              etimer_set(&timer_send_packet, CLOCK_SECOND * 2);
+              //image divided in 16 packets of 1200: 16 = 160 *120 /1200
+              for (ipkg = 0; ipkg < 32; ipkg++)
+              {
+                  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
+                  send(sd, frame_buffer+(ipkg*1200),1200, 0);
+                  etimer_reset(&timer_send_packet);
+              }
+          }
+//          closesocket(sd);
+      }
+      GPIO_ResetBits(GPIOD, GPIO_Pin_14);
+      GPIO_SetBits(GPIOD, GPIO_Pin_12);
+      DMA_Cmd(DMA2_Stream1, ENABLE);
+      DCMI_Cmd(ENABLE);
+      /* Insert 100ms delay: wait 100ms */
+      Delay(200);
+      DCMI_CaptureCmd(ENABLE);
+      GPIO_ResetBits(GPIOD, GPIO_Pin_12);
+
+      etimer_reset(&timer_send_image);
+  }
+  PROCESS_END();
+}
 
 
