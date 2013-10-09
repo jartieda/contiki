@@ -17,6 +17,7 @@ int ubRxMax=0;
 int ubTxMax=0;
 uint8_t wifi_state=3;//0 tx, 1 rx header, 2 rx body , 3 tx Init;
 
+uint8_t wifi_dhcp = 0;
 
 void (*_pfRxHandler)();
 /* The SpiOpen function is called from the wlan_start API function. The main  */
@@ -405,7 +406,10 @@ void  SpiResumeSpi(void)
 
 void fWlanCB(long event_type, char * data, unsigned char length )
 {
-
+	if (event_type == 0x8010)//DHCP
+	{
+		wifi_dhcp = 1;
+	}
 }
 
 /* Callback provided during wlan_init call and invoked to read a value of     */

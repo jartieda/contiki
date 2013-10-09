@@ -47,7 +47,7 @@ configure(int type, int c)
 
 
 	  /* DMA2 Stream0 channel2 configuration **************************************/
-	  DMA_InitStructure.DMA_Channel = DMA_Channel_2;
+	  DMA_InitStructure.DMA_Channel = DMA_Channel_0;
 	  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(ADC1->DR);
 	  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)windValue;
 	  DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;

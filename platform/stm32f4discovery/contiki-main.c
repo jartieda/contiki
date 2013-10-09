@@ -35,6 +35,8 @@ extern ImageFormat_TypeDef  ImageFormat;
 extern __IO uint8_t         ValueMax;
 extern const uint8_t *      ImageForematArray[];
 
+extern uint8_t wifi_dhcp ;
+
 uint32_t clocktime;
 
 //#define WIFI_BOARD
@@ -103,7 +105,9 @@ main()
   process_start(&sensors_process,NULL);
 
   int sd = -1;
-  Delay(1100);
+  while(wifi_dhcp == 0){
+	  Delay(100);
+  }
   sd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
   if (sd != -1)
   {
@@ -114,20 +118,18 @@ main()
   int connected = -1;
   sockaddr addr;
   unsigned short port = 81;
-  char wifi_buff[] = "POST /index.php HTTP/1.1\
-Host: 192.168.1.2\
-User-Agent: my custom client v.1\
-Content-Type: application/octet-stream\
-Content-Length: 10\
-\
-1234567890\n";
-  int wifi_buff_leng = sizeof("POST /index.php HTTP/1.1\
-Host: 192.168.1.2\
-User-Agent: my custom client v.1\
-Content-Type: application/octet-stream\
-Content-Length: 10\
-\
-1234567890\n");
+  char wifi_buff[] = "POST /recibeimg.php HTTP/1.1\n\
+Host: 192.168.1.2\n\
+User-Agent: my custom client v.1\n\
+Content-Type: application/octet-stream\n\
+Content-Length: 38400\n\
+\n";
+  int wifi_buff_leng = sizeof("POST /recibeimg.php HTTP/1.1\n\
+Host: 192.168.1.2\n\
+User-Agent: my custom client v.1\n\
+Content-Type: application/octet-stream\n\
+Content-Length: 38400\n\
+\n");
 /*  memcpy(wifi_buff, "POST /index.php HTTP/1.1\
 Host: 192.168.1.2\
 User-Agent: my custom client v.1\
@@ -140,10 +142,10 @@ Content-Length: 10\
   addr.sa_data[0] = (port & 0xFF00) >> 8;
   addr.sa_data[1] = (port & 0x00FF);
   //ip
-  addr.sa_data[5] = 192;
-  addr.sa_data[4] = 168;
-  addr.sa_data[3] = 1;
-  addr.sa_data[2] = 2;
+  addr.sa_data[2] = 192;
+  addr.sa_data[3] = 168;
+  addr.sa_data[4] = 1;
+  addr.sa_data[5] = 2;
 //  addr.sin_zero
 
   connected = connect(sd,&addr,sizeof(addr));
@@ -151,6 +153,15 @@ Content-Length: 10\
   {
 	  GPIO_ResetBits(GPIOD, GPIO_Pin_12);
 	  send(sd, wifi_buff, wifi_buff_leng, 0);
+	  Delay(2000);
+	  for (int ipkg = 0; ipkg < 32; ipkg++){//16 = 160 *120 /1200 -> hago packetes de 1200
+		  send(sd, frame_buffer+(ipkg*1200),1200, 0);
+		  Delay(2000);
+		  while(tSLInformation.usNumberOfFreeBuffers==0)
+		  {
+			  Delay(100);
+		  }
+	  }
   }
   while(1) {
 //    wlan_start(0,&wlan_pt);
@@ -163,6 +174,7 @@ Content-Length: 10\
 //	    		GPIO_ResetBits(GPIOD, GPIO_Pin_14);
 
 	    	}
+
 		}
    // 	watchdog_periodic();
 		etimer_request_poll();

@@ -24,7 +24,7 @@ unsigned long _lastreadtime;
 char firstreading=1;
 char *text;
 static uint8_t laststate = 1;
-static uint8_t counter = 0;
+static uint32_t counter = 0;
 static uint8_t j = 0, i;
 
 PROCESS(dht11_process, "wifi spi process");
@@ -127,15 +127,16 @@ float dht11_readHumidity(void) {
 }
 */
 
-#define US_TIME  1
-//  SystemCoreClock/12000000    /* 10 uS */
+#define US_TIME  16
+//  SystemCoreClock/1000000    /* 10 uS */
 void
 sleep_us (int us){
-//    volatile int    i;
-    while (us--) {
-//        for (i = 0; i < US_TIME; i++) {
-//            ;    /* Burn cycles. */
-//        }
+    volatile int    i;
+    while (us>0) {
+    	us--;
+    	for (i = 0; i < US_TIME; i++) {
+            ;    /* Burn cycles. */
+        }
     }
 }
 //PT_THREAD(dht11_read(struct pt *pt)) {
@@ -155,6 +156,19 @@ sleep_us (int us){
 	    // pull the pin high and wait 250 milliseconds
 		set_dir(1);
 		GPIO_SetBits(DHT11_PORT, DHT11_PIN);
+		sleep_us(100);
+		GPIO_ResetBits(DHT11_PORT, DHT11_PIN);
+		sleep_us(100);
+		GPIO_SetBits(DHT11_PORT, DHT11_PIN);
+		sleep_us(100);
+		GPIO_ResetBits(DHT11_PORT, DHT11_PIN);
+		sleep_us(100);
+		GPIO_SetBits(DHT11_PORT, DHT11_PIN);
+		sleep_us(100);
+		GPIO_ResetBits(DHT11_PORT, DHT11_PIN);
+		sleep_us(100);
+		GPIO_SetBits(DHT11_PORT, DHT11_PIN);
+		sleep_us(100);
 
 		//delay(250);
 		etimer_set(&etimer_dht11, CLOCK_SECOND / 4);
@@ -200,7 +214,7 @@ sleep_us (int us){
 			//PT_WAIT_UNTIL(pt, (GPIOGetValue(DHT11_PORT,DHT11_PIN) != laststate)||etimer_expired(&etimer));
 			counter++;
 			sleep_us(1);
-			if (counter >= 255) {
+			if (counter >= 256) {
 	//			puts("couner mui grande");
 				break;
 			}
@@ -213,13 +227,13 @@ sleep_us (int us){
 
 		// ignore first 3 transitions
 		if ((i >= 4) && (i%2 == 0)) {
-		  // shove each bit into the storage bytes
+		  //shove each bit into the storage bytes
 		  data[j/8] <<= 1;
-		  if (counter > 25){
-			data[j/8] |= 1;
-			//GPIOSetValue(2,10,1 );
+		  if (counter > 10){
+			  data[j/8] |= 1;
+			  //GPIOSetValue(2,10,1 );
 		  }else{
-			//GPIOSetValue(2,10,0 );
+			  //GPIOSetValue(2,10,0 );
 		  }
 		  j++;
 		}
@@ -232,6 +246,8 @@ sleep_us (int us){
 
 		  sensors_changed(&DHT11_sensor);
 	  }
+	  set_dir(1);
+	  GPIO_ResetBits(DHT11_PORT, DHT11_PIN);
 
 	  GPIO_ResetBits(GPIOD, GPIO_Pin_15);//led
 
