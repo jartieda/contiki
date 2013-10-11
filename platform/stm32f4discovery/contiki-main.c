@@ -49,7 +49,7 @@ uint32_t clocktime;
 // Private function prototypes
 void Delay(volatile uint32_t nCount);
 void init();
-extern uint8_t frame_buffer[160*120];
+extern uint8_t frame_buffer[160*120];//FIXME ESTO DEBERIA SER DE 2*160*120 O uint16_t
 
 unsigned int idle_count = 0;
 
@@ -238,7 +238,9 @@ Content-Length: 38400\n\
                   etimer_reset(&timer_send_packet);
               }
           }
-//          closesocket(sd);
+          PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
+
+          closesocket(sd);
       }
       GPIO_ResetBits(GPIOD, GPIO_Pin_14);
       GPIO_SetBits(GPIOD, GPIO_Pin_12);
@@ -247,6 +249,7 @@ Content-Length: 38400\n\
       /* Insert 100ms delay: wait 100ms */
       Delay(200);
       DCMI_CaptureCmd(ENABLE);
+      DMA_ClearITPendingBit(DMA2_Stream1, DMA_IT_TCIF1);
       GPIO_ResetBits(GPIOD, GPIO_Pin_12);
 
       etimer_reset(&timer_send_image);
