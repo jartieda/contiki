@@ -1,0 +1,25 @@
+STM32TEST =  
+
+
+CONTIKI_TARGET_DIRS = . CC3000
+# Master clock frequency
+MCK=48000000
+CFLAGS+=-DAUTOSTART_ENABLE
+
+ifndef CONTIKI_TARGET_MAIN
+CONTIKI_TARGET_MAIN = contiki-main.c
+endif
+
+CONTIKI_TARGET_SOURCEFILES += $(SENSORS) $(STEPPER_ROBOT) \
+ $(CODEPROP_SOURCES) $(CONTIKI_TARGET_MAIN) \
+	cc3000_common.c hci.c nvmem.c socket.c \
+	evnt_handler.c netapp.c os.c wlan.c spi.c leds-arch.c leds.c RGBled.c\
+	
+
+# include $(CONTIKI)/platform/$(TARGET)/apps/Makefile.apps
+
+include $(CONTIKI)/cpu/stm32f4/Makefile.stm32f4
+
+#contiki-$(TARGET).a: ${addprefix $(OBJECTDIR)/,symbols.o}
+
+
