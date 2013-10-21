@@ -16,7 +16,9 @@ extern const struct sensors_sensor wind_sensor;
 #define WIND_SENSOR "WIND"
 
 #define WIND_SPEED 1
-#define WIND_DIR 2
+#define WIND_DIR   2
+#define RADIATION  3
+
 
 
 

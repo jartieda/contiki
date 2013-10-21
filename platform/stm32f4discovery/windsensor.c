@@ -11,7 +11,7 @@
 
 const struct sensors_sensor wind_sensor;
 
-__IO uint16_t windValue[2] = {0, 0};
+__IO uint16_t windValue[3] = {0, 0, 0};
 
 /*---------------------------------------------------------------------------*/
 static int
@@ -20,13 +20,17 @@ value(int type)
 //	  uwVoltage = (uwADCxConvertedVoltage)/1000;
 //	  uwMVoltage = (uwADCxConvertedVoltage%1000)/100;
 
-	if (type== WIND_SPEED)
-	{
-		return windValue[1];
-	}else if(type == WIND_DIR)
+	if (type== WIND_DIR)
 	{
 		return windValue[0];
-	}else{
+	}else if(type == WIND_SPEED)
+	{
+		return windValue[1];
+	}else if(type == RADIATION)
+	{
+		return windValue[2];
+	}
+	else{
 		return 0;
 	}
 }
@@ -43,7 +47,7 @@ configure(int type, int c)
 	  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2, ENABLE);
 	  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
 	  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
-	  RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC3, ENABLE);
+	  RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
 
 
 	  /* DMA2 Stream0 channel2 configuration **************************************/
@@ -51,7 +55,7 @@ configure(int type, int c)
 	  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(ADC1->DR);
 	  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)windValue;
 	  DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
-	  DMA_InitStructure.DMA_BufferSize = 2;
+	  DMA_InitStructure.DMA_BufferSize = 3;
 	  DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
 	  DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
 	  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
@@ -65,12 +69,19 @@ configure(int type, int c)
 	  DMA_Init(DMA2_Stream0, &DMA_InitStructure);
 	  DMA_Cmd(DMA2_Stream0, ENABLE);
 
-	  /* Configure ADC3 Channel7 pin as analog input ******************************/
+	  /* Configure ADC1 Channel8 (PB0) pin as analog input ******************************/
+	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
+	  GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+	  /* Configure ADC1 Channel9 (PB1) pin as analog input ******************************/
 	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
 	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
 	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
 	  GPIO_Init(GPIOB, &GPIO_InitStructure);
 
+	  /* Configure ADC1 Channel10 (PC0) pin as analog input ******************************/
 	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
 	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
 	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
@@ -90,22 +101,24 @@ configure(int type, int c)
 	  ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
 	  ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
 	  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-	  ADC_InitStructure.ADC_NbrOfConversion = 2;
+	  ADC_InitStructure.ADC_NbrOfConversion = 3;
 	  ADC_Init(ADC1, &ADC_InitStructure);
 
-	  /* ADC3 regular channel7 configuration *************************************/
+	  /* ADC1 regular channel0 configuration *************************************/
 	  //wind dir
-	  ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_3Cycles);
+	  ADC_RegularChannelConfig(ADC1, ADC_Channel_10, 1, ADC_SampleTime_3Cycles);
 	  //wind speed
 	  ADC_RegularChannelConfig(ADC1, ADC_Channel_9, 2, ADC_SampleTime_3Cycles);
+	  //radiation sensor
+	  ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 3, ADC_SampleTime_3Cycles);
 
 	  /* Enable DMA request after last transfer (Single-ADC mode) */
 	  ADC_DMARequestAfterLastTransferCmd(ADC1, ENABLE);
 
-	  /* Enable ADC3 DMA */
+	  /* Enable ADC1 DMA */
 	  ADC_DMACmd(ADC1, ENABLE);
 
-	  /* Enable ADC3 */
+	  /* Enable ADC1 */
 	  ADC_Cmd(ADC1, ENABLE);
 
 	  ADC_SoftwareStartConv(ADC1);
