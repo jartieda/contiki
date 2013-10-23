@@ -55,7 +55,6 @@ main()
   init();
   process_init();
   process_start(&etimer_process, NULL);
-  autostart_start(autostart_processes);
 
 
   //watchdog_start();
@@ -68,7 +67,9 @@ main()
 	  Delay(100);
   }
 
-  //process_start(&wifi_client_process, NULL);
+  autostart_start(autostart_processes);
+
+  process_start(&wifi_client_process, NULL);
   int brightness = 0;
   while(1) {
     do {
@@ -78,17 +79,14 @@ main()
 	          brightness+=10;
 
 
-	          TIM5->CCR1 = 333 - (brightness + 0) % 666; // set brightness
-	          TIM5->CCR2 = 333 - (brightness + 166/2) % 666; // set brightness
-	          TIM5->CCR3 = 333 - (brightness + 333/2) % 666; // set brightness
 
 	    	if (clocktime%2==0){
 	    		GPIO_SetBits(GPIOE, GPIO_Pin_10);
-	    		GPIO_SetBits(GPIOE, GPIO_Pin_11);
+//	    		GPIO_SetBits(GPIOE, GPIO_Pin_11);
 	    		GPIO_SetBits(GPIOE, GPIO_Pin_12);
 	    	}else{
 	    		GPIO_ResetBits(GPIOE, GPIO_Pin_10);
-	    		GPIO_ResetBits(GPIOE, GPIO_Pin_11);
+//	    		GPIO_ResetBits(GPIOE, GPIO_Pin_11);
 	    		GPIO_ResetBits(GPIOE, GPIO_Pin_12);
 
 	    	}
@@ -168,19 +166,19 @@ PROCESS_THREAD(wifi_client_process, ev, data)
   static sockaddr addr;
   static unsigned short port;
   static int ipkg;
-  char wifi_buff[] = "POST /recibeimg.php HTTP/1.1\n\
+  char wifi_buff[] = "POST /moodlight/get_color.php HTTP/1.1\n\
 Host: 192.168.1.2\n\
 User-Agent: my custom client v.1\n\
 Content-Type: application/octet-stream\n\
-Content-Length: 38400\n\
+Content-Length: 0\n\
 \n";
-  int wifi_buff_leng = sizeof("POST /recibeimg.php HTTP/1.1\n\
+  int wifi_buff_leng = sizeof("POST /moodlight/get_color.php HTTP/1.1\n\
 Host: 192.168.1.2\n\
 User-Agent: my custom client v.1\n\
 Content-Type: application/octet-stream\n\
-Content-Length: 38400\n\
+Content-Length: 0\n\
 \n");
-
+  char recv_buff[400];
   PROCESS_BEGIN();
   sd = -1;
   connected = -1;
@@ -205,17 +203,52 @@ Content-Length: 38400\n\
           connected = connect(sd,&addr,sizeof(addr));
           if (connected == 0)
           {
-              GPIO_SetBits(GPIOD, GPIO_Pin_14);
-              //header
+	    	  GPIO_SetBits(GPIOE, GPIO_Pin_11);
+	    	  //header
               send(sd, wifi_buff, wifi_buff_leng, 0);
-              etimer_set(&timer_send_packet, CLOCK_SECOND * 2);
+              etimer_set(&timer_send_packet, CLOCK_SECOND * 5);
+              PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
               //image divided in 16 packets of 1200: 16 = 160 *120 /1200
-              for (ipkg = 0; ipkg < 32; ipkg++)
-              {
-                  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
-                  send(sd, frame_buffer+(ipkg*1200),1200, 0);
-                  etimer_reset(&timer_send_packet);
+//              for (ipkg = 0; ipkg < 32; ipkg++)
+//              {
+//                  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
+//       //           send(sd, frame_buffer+(ipkg*1200),1200, 0);
+//                  etimer_reset(&timer_send_packet);
+//              }
+
+              long n_received = recv(sd, recv_buff, 400, 0);
+              char b[3]={48,48,48};
+              char g[3]={48,48,48};
+              char r[3]={48,48,48};
+              int n = 2;
+              n_received--;
+              while (recv_buff[n_received]!=' '){
+            	  b[n]=recv_buff[n_received];
+            	  n--;
+            	  n_received--;
               }
+              n_received--;
+              n = 2;
+              while (recv_buff[n_received]!=' '){
+				  g[n]=recv_buff[n_received];
+				  n--;
+				  n_received--;
+			  }
+              n_received--;
+              n = 2;
+			  while (recv_buff[n_received]>=48&&recv_buff[n_received]<=57){
+			    r[n]=recv_buff[n_received];
+			    n--;
+			    n_received--;
+			  }
+			  int rr = (r[0]-48)*100+(r[1]-48)*10+(r[2]-48);
+			  int gg = (g[0]-48)*100+(g[1]-48)*10+(g[2]-48);
+			  int bb = (b[0]-48)*100+(b[1]-48)*10+(b[2]-48);
+			  TIM5->CCR1 = rr*2; // set brightness
+			  TIM5->CCR3 = gg*2; // set brightness
+			  TIM5->CCR2 = bb*2; // set brightness
+
+              etimer_reset(&timer_send_packet);
           }
           PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
 
@@ -224,7 +257,6 @@ Content-Length: 38400\n\
       GPIO_ResetBits(GPIOE, GPIO_Pin_11);
       //GPIO_SetBits(GPIOE, GPIO_Pin_12);
       //GPIO_ResetBits(GPIOE, GPIO_Pin_12);
-
       etimer_reset(&timer_send_image);
   }
   PROCESS_END();

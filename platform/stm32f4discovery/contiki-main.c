@@ -23,6 +23,8 @@
 #include "dcmi_ov2640.h"
 #include "socket.h"
 
+extern int e_sprintf(char *out, const char *format, ...);
+
 PROCINIT(&etimer_process );
 
 SENSORS(&DHT11_sensor, &wind_sensor);
@@ -189,32 +191,63 @@ PROCESS_THREAD(wifi_client_process, ev, data)
   static sockaddr addr;
   static unsigned short port;
   static int ipkg;
-  char wifi_buff[] = "POST /recibeimg.php HTTP/1.1\n\
-Host: 192.168.1.2\n\
+  char wifi_buff[] = "POST /nowcasting/recibe_foto_small.php HTTP/1.1\n\
+Host: 80.28.200.188\n\
 User-Agent: my custom client v.1\n\
 Content-Type: application/octet-stream\n\
 Content-Length: 38400\n\
 \n";
-  int wifi_buff_leng = sizeof("POST /recibeimg.php HTTP/1.1\n\
-Host: 192.168.1.2\n\
+  int wifi_buff_leng = sizeof("POST /nowcasting/recibe_foto_small.php HTTP/1.1\n\
+Host: 80.28.200.188\n\
 User-Agent: my custom client v.1\n\
 Content-Type: application/octet-stream\n\
 Content-Length: 38400\n\
 \n");
 
+  char sensor_buff[400] = "POST /nowcasting/?r=meteoVal/addfromstation HTTP/1.1\n\
+Host: 80.28.200.188\n\
+User-Agent: my custom client v.1\n\
+Content-Type: application/x-www-form-urlencoded\n\
+Content-Length: ";
+  int sensor_buff_leng= sizeof("POST /nowcasting/?r=meteoVal/addfromstation HTTP/1.1\n\
+Host: 80.28.200.188\n\
+User-Agent: my custom client v.1\n\
+Content-Type: application/x-www-form-urlencoded\n\
+Content-Length: ");
+  char content_length[10];
+  int conten_length_leng=0;
+  char sensor_payload[200];
+  int sensor_payload_leng = 0;
+/*Windspeed
+Winddirection
+temp
+pres
+pira
+hum
+*/
+
   PROCESS_BEGIN();
   sd = -1;
   connected = -1;
   addr.sa_family = AF_INET;
+//  // port
+//  port = 81;
+//  addr.sa_data[0] = (port & 0xFF00) >> 8;
+//  addr.sa_data[1] = (port & 0x00FF);
+//  //ip
+//  addr.sa_data[2] = 192;
+//  addr.sa_data[3] = 168;
+//  addr.sa_data[4] = 1;
+//  addr.sa_data[5] = 2;
   // port
-  port = 81;
+  port = 80;
   addr.sa_data[0] = (port & 0xFF00) >> 8;
   addr.sa_data[1] = (port & 0x00FF);
   //ip
-  addr.sa_data[2] = 192;
-  addr.sa_data[3] = 168;
-  addr.sa_data[4] = 1;
-  addr.sa_data[5] = 2;
+  addr.sa_data[2] = 80;
+  addr.sa_data[3] = 28;
+  addr.sa_data[4] = 200;
+  addr.sa_data[5] = 188;
 
   while (1)
   {
@@ -242,6 +275,42 @@ Content-Length: 38400\n\
 
           closesocket(sd);
       }
+      GPIO_ResetBits(GPIOD, GPIO_Pin_14);
+      // start sending measure
+      etimer_reset(&timer_send_image);
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_image));
+      sd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
+      if (sd != -1)
+      {
+          connected = connect(sd,&addr,sizeof(addr));
+          if (connected == 0)
+          {
+              GPIO_SetBits(GPIOD, GPIO_Pin_14);
+              //header
+              int rad = wind_sensor.value(RADIATION);
+              int wind= wind_sensor.value(WIND_SPEED);
+              int wdir= wind_sensor.value(WIND_DIR);
+              /*char s_rad[5];
+              itoa(rad, s_rad);
+              char s_win[5];
+              itoa(wind, s_win);
+              char s_dir[5];
+			  itoa(wdir, s_dir);*/
+              sensor_payload_leng= 45;
+              /*itoa(sensor_payload_leng, content_length );
+              strcpy(&sensor_buff[196],content_length);
+              strcpy(&sensor_buff[200],"\n\n");
+              strcpy(&sensor_buff[200])*/
+              e_sprintf(&sensor_buff[170], "%d\n\
+\n\
+Windspeed=%d&Winddirection=%d&pira=%d\n",sensor_payload_leng, wind,wdir,rad );
+              send(sd, sensor_buff, strlen(sensor_buff)	, 0);
+              etimer_set(&timer_send_packet, CLOCK_SECOND * 2);
+              PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
+          }
+          closesocket(sd);
+      }
+
       GPIO_ResetBits(GPIOD, GPIO_Pin_14);
       GPIO_SetBits(GPIOD, GPIO_Pin_12);
       DMA_Cmd(DMA2_Stream1, ENABLE);
