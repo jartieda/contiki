@@ -100,7 +100,6 @@ main()
     DCMI_CaptureCmd(ENABLE);
   }
 
-  //watchdog_start();
 
   /* Initializate the WIFI */
   wlan_start(0);
@@ -113,6 +112,8 @@ main()
   process_start(&sensors_process,NULL);
 
   process_start(&wifi_client_process, NULL);
+  watchdog_start();
+  GPIO_ResetBits(GPIOD, GPIO_Pin_12);
 
   while(1) {
     do {
@@ -122,11 +123,9 @@ main()
 	    		GPIO_SetBits(GPIOD, GPIO_Pin_15);
 	    	}else{
 	    		GPIO_ResetBits(GPIOD, GPIO_Pin_15);
-
 	    	}
-
 		}
-   // 	watchdog_periodic();
+    	watchdog_periodic();
 		etimer_request_poll();
 
     } while(process_run() > 0);
@@ -154,7 +153,6 @@ void init() {
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
-	GPIO_SetBits(GPIOD, GPIO_Pin_12);
 
 	// Initialize WiFi
 	wlan_init(fWlanCB,0,0,0,
@@ -264,27 +262,40 @@ hum
               {
                   send(sd, frame_buffer+(ipkg*1200),1200, 0);
                   //etimer_reset(&timer_send_packet);
+                  watchdog_periodic();
                   PROCESS_WAIT_EVENT_UNTIL(tSLInformation.usNumberOfFreeBuffers>4);
                   freebuff=0;
+
               }
+          }else{
+        	  while(1);//make watchdog reset de device
           }
 //          PROCESS_WAIT_EVENT_UNTIL(freebuff==1);
 
           //PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
-
+          GPIO_ResetBits(GPIOD, GPIO_Pin_14);
+          watchdog_periodic();
           closesocket(sd);
+          watchdog_periodic();
+      }else{
+    	  while(1);//make watchdog reset de device
       }
-      GPIO_ResetBits(GPIOD, GPIO_Pin_14);
+      GPIO_SetBits(GPIOD, GPIO_Pin_14);
       // start sending measure
       etimer_set(&timer_send_image, CLOCK_SECOND * 15);
       etimer_reset(&timer_send_image);//deberian ser 15 segundos
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_image));
+      GPIO_ResetBits(GPIOD, GPIO_Pin_14);
+      GPIO_SetBits(GPIOD, GPIO_Pin_12);
+      watchdog_periodic();
       sd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
       if (sd != -1)
       {
+          watchdog_periodic();
           connected = connect(sd,&addr,sizeof(addr));
           if (connected == 0)
           {
+        	  watchdog_periodic();
               GPIO_SetBits(GPIOD, GPIO_Pin_14);
               //header
               int rad = wind_sensor.value(RADIATION);
@@ -314,8 +325,7 @@ Windspeed=%03d&Winddirection=%03d&pira=%03d&temp=%03d&hum=%03d\n",sensor_payload
           closesocket(sd);
       }
 
-      GPIO_ResetBits(GPIOD, GPIO_Pin_14);
-      GPIO_SetBits(GPIOD, GPIO_Pin_12);
+      //GPIO_ResetBits(GPIOD, GPIO_Pin_12); reset in dcmi handler
       capture_next_frame=1;
 
       etimer_reset(&timer_send_image);

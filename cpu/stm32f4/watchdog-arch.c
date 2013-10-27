@@ -51,16 +51,27 @@
 void
 watchdog_init(void)
 {
-  /* WWDG configuration */
-  /* Enable WWDG clock */
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE);
+	 /* IWDG timeout equal to 250 ms (the timeout may varies due to LSI frequency
+	     dispersion) */
+	  /* Enable write access to IWDG_PR and IWDG_RLR registers */
+	  IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);
 
-  /* WWDG clock counter = (PCLK1 (42MHz)/4096)/8 = 1281 Hz (~780 us)  */
-  WWDG_SetPrescaler(WWDG_Prescaler_8);
+	  /* IWDG counter clock: LSI/32 */
+	  IWDG_SetPrescaler(IWDG_Prescaler_32);
 
-  /* Set Window value to 80; WWDG counter should be refreshed only when the counter
-    is below 80 (and greater than 64) otherwise a reset will be generated */
-  WWDG_SetWindowValue(80);
+	  /* Set counter reload value to obtain 250ms IWDG TimeOut.
+	     IWDG counter clock Frequency = LsiFreq/32
+	     Counter Reload Value = 250ms/IWDG counter clock period
+	                          = 0.25s / (32/LsiFreq)
+	                          = LsiFreq/(32 * 4)
+	                          = LsiFreq/128
+	   */
+
+	  IWDG_SetReload(SystemCoreClock/16);//2 seg
+
+	  /* Reload IWDG counter */
+	  IWDG_ReloadCounter();
+
 
 
 }
@@ -68,20 +79,16 @@ watchdog_init(void)
 void
 watchdog_start(void)
 {
-    /* Enable WWDG and set counter value to 127, WWDG timeout = ~780 us * 64 = 49.92 ms 
-     In this case the refresh window is: 
-           ~780 * (127-80) = 36.6ms < refresh window < ~780 * 64 = 49.9ms
-  */
-  WWDG_Enable(127);
+	  /* Enable IWDG (the LSI oscillator will be enabled by hardware) */
+	  IWDG_Enable();
 
 }
 /*---------------------------------------------------------------------------*/
 void
 watchdog_periodic(void)
 {
-  /* This function is called periodically to restart the watchdog timer. */
-    /* Update WWDG counter */
-    WWDG_SetCounter(0x7F);
+	   /* Reload IWDG counter */
+	    IWDG_ReloadCounter();
 }
 /*---------------------------------------------------------------------------*/
 void
