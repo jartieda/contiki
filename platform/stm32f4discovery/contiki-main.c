@@ -40,6 +40,7 @@ extern __IO uint8_t         ValueMax;
 extern const uint8_t *      ImageForematArray[];
 
 extern uint8_t wifi_dhcp ;
+extern uint8_t freebuff ;
 
 uint32_t clocktime;
 
@@ -55,6 +56,7 @@ extern uint8_t frame_buffer[160*120];//FIXME ESTO DEBERIA SER DE 2*160*120 O uin
 
 unsigned int idle_count = 0;
 
+char capture_next_frame= 0;
 
 int
 main()
@@ -117,9 +119,9 @@ main()
 		if (clocktime!=clock_seconds()) {
 			clocktime=clock_seconds();
 	    	if (clocktime%2==0){
-//	    		GPIO_SetBits(GPIOD, GPIO_Pin_14);
+	    		GPIO_SetBits(GPIOD, GPIO_Pin_15);
 	    	}else{
-//	    		GPIO_ResetBits(GPIOD, GPIO_Pin_14);
+	    		GPIO_ResetBits(GPIOD, GPIO_Pin_15);
 
 	    	}
 
@@ -153,16 +155,6 @@ void init() {
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
 	GPIO_SetBits(GPIOD, GPIO_Pin_12);
-
-	// State Leds Clock (only for Wifi BOARD)
-//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
-	// State Leds
-//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 | GPIO_Pin_11| GPIO_Pin_12;
-//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-//	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-//	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-//	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-//	GPIO_Init(GPIOE, &GPIO_InitStructure);
 
 	// Initialize WiFi
 	wlan_init(fWlanCB,0,0,0,
@@ -262,22 +254,30 @@ hum
               GPIO_SetBits(GPIOD, GPIO_Pin_14);
               //header
               send(sd, wifi_buff, wifi_buff_leng, 0);
-              etimer_set(&timer_send_packet, CLOCK_SECOND * 2);
+              //etimer_set(&timer_send_packet, CLOCK_SECOND * 3);
               //image divided in 16 packets of 1200: 16 = 160 *120 /1200
+              //PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
+              PROCESS_WAIT_EVENT_UNTIL(tSLInformation.usNumberOfFreeBuffers>4);
+			  //freebuff=0;
+              //
               for (ipkg = 0; ipkg < 32; ipkg++)
               {
-                  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
                   send(sd, frame_buffer+(ipkg*1200),1200, 0);
-                  etimer_reset(&timer_send_packet);
+                  //etimer_reset(&timer_send_packet);
+                  PROCESS_WAIT_EVENT_UNTIL(tSLInformation.usNumberOfFreeBuffers>4);
+                  freebuff=0;
               }
           }
-          PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
+//          PROCESS_WAIT_EVENT_UNTIL(freebuff==1);
+
+          //PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
 
           closesocket(sd);
       }
       GPIO_ResetBits(GPIOD, GPIO_Pin_14);
       // start sending measure
-      etimer_reset(&timer_send_image);
+      etimer_set(&timer_send_image, CLOCK_SECOND * 15);
+      etimer_reset(&timer_send_image);//deberian ser 15 segundos
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_image));
       sd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
       if (sd != -1)
@@ -290,40 +290,53 @@ hum
               int rad = wind_sensor.value(RADIATION);
               int wind= wind_sensor.value(WIND_SPEED);
               int wdir= wind_sensor.value(WIND_DIR);
+              int hum = DHT11_sensor.value(DHT11_SENSOR_HUM);
+              int temp = DHT11_sensor.value(DHT11_SENSOR_TEMP);
               /*char s_rad[5];
               itoa(rad, s_rad);
               char s_win[5];
               itoa(wind, s_win);
               char s_dir[5];
 			  itoa(wdir, s_dir);*/
-              sensor_payload_leng= 45;
+              sensor_payload_leng= 62;
               /*itoa(sensor_payload_leng, content_length );
               strcpy(&sensor_buff[196],content_length);
               strcpy(&sensor_buff[200],"\n\n");
               strcpy(&sensor_buff[200])*/
               e_sprintf(&sensor_buff[170], "%d\n\
 \n\
-Windspeed=%d&Winddirection=%d&pira=%d\n",sensor_payload_leng, wind,wdir,rad );
+Windspeed=%03d&Winddirection=%03d&pira=%03d&temp=%03d&hum=%03d\n",sensor_payload_leng, wind,wdir,rad, temp,hum );
               send(sd, sensor_buff, strlen(sensor_buff)	, 0);
               etimer_set(&timer_send_packet, CLOCK_SECOND * 2);
               PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
+              PROCESS_WAIT_EVENT_UNTIL(tSLInformation.usNumberOfFreeBuffers>4);
           }
           closesocket(sd);
       }
 
       GPIO_ResetBits(GPIOD, GPIO_Pin_14);
       GPIO_SetBits(GPIOD, GPIO_Pin_12);
-      DMA_Cmd(DMA2_Stream1, ENABLE);
-      DCMI_Cmd(ENABLE);
-      /* Insert 100ms delay: wait 100ms */
-      Delay(200);
-      DCMI_CaptureCmd(ENABLE);
-      DMA_ClearITPendingBit(DMA2_Stream1, DMA_IT_TCIF1);
-      GPIO_ResetBits(GPIOD, GPIO_Pin_12);
+      capture_next_frame=1;
 
       etimer_reset(&timer_send_image);
   }
   PROCESS_END();
 }
-
+void DCMI_IRQHandler(void)
+{
+	if(DCMI_GetITStatus(DCMI_IT_FRAME)	!= RESET)
+	{
+		if (capture_next_frame == 1){
+		      DMA_Cmd(DMA2_Stream1, ENABLE);
+		      //DCMI_Cmd(ENABLE);
+		      /* Insert 100ms delay: wait 100ms */
+		      //Delay(200);
+		      //DCMI_CaptureCmd(ENABLE);
+		      DMA_ClearITPendingBit(DMA2_Stream1, DMA_IT_TCIF1);
+		      GPIO_ResetBits(GPIOD, GPIO_Pin_12);
+		      capture_next_frame=0;
+		}
+		DCMI_ClearITPendingBit(DCMI_IT_FRAME);
+	}
+}
 

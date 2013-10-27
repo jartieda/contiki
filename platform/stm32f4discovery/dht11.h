@@ -22,7 +22,7 @@ extern const struct sensors_sensor DHT11_sensor;
 
 
 // how many timing transitions we need to keep track of. 2 * number bits + extra
-#define MAXTIMINGS 85
+#define MAXTIMINGS 84
 
 #define DHT11 11
 #define DHT22 22

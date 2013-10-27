@@ -18,6 +18,7 @@ int ubTxMax=0;
 uint8_t wifi_state=3;//0 tx, 1 rx header, 2 rx body , 3 tx Init;
 
 uint8_t wifi_dhcp = 0;
+uint8_t freebuff = 0;
 
 void (*_pfRxHandler)();
 /* The SpiOpen function is called from the wlan_start API function. The main  */
@@ -409,6 +410,19 @@ void fWlanCB(long event_type, char * data, unsigned char length )
 	if (event_type == 0x8010)//DHCP
 	{
 		wifi_dhcp = 1;
+	}else
+	if (event_type == 0x4100)//DHCP
+	{
+		freebuff = 1;
+	}else
+	if (event_type == 0x1081)//DHCP
+	{
+		//freebuff = 1;
+	}else if (event_type == 0x99)//DHCP
+	{
+		//freebuff = 1;
+	}else if (event_type != 0x8200){
+		freebuff = 0;
 	}
 }
 
@@ -502,8 +516,6 @@ void EXTI9_5_IRQHandler(void)
 {
   if(EXTI_GetITStatus(EXTI_Line8) != RESET)
   {
-    /* Set LED */
-	  GPIO_SetBits(GPIOE, GPIO_Pin_12);
 	  SpiReceive(wlan_rx_buffer);
     /* Clear the EXTI line 0 pending bit */
     EXTI_ClearITPendingBit(EXTI_Line8);

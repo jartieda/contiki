@@ -19,7 +19,7 @@
 #include <signal.h>
 
 const struct sensors_sensor DHT11_sensor;
-uint8_t data[6];
+uint8_t dht11_data[6];
 unsigned long _lastreadtime;
 char firstreading=1;
 char *text;
@@ -46,6 +46,36 @@ PROCESS(dht11_process, "wifi spi process");
 //  firstreading = true;
 //}
 void set_dir(uint8_t dir){
+//	GPIO_InitTypeDef  GPIO_InitStructure;
+//
+//	// GPIOD Periph clock enable
+//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+//
+//	// Configure PD12, PD13, PD14 and PD15 in output pushpull mode
+//	GPIO_InitStructure.GPIO_Pin = DHT11_PIN;
+//	if (dir !=0){
+//		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+//	}else{
+//		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+//	}
+//	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+//	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+//	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+//	GPIO_Init(DHT11_PORT, &GPIO_InitStructure);
+	//0 IN
+	//1 OUT
+	if (dir==1){
+		DHT11_PORT->MODER  &= ~(GPIO_MODER_MODER0 << (13 * 2));
+		DHT11_PORT->MODER |= (((uint32_t)GPIO_Mode_OUT) << (13 * 2));
+	}else{
+		DHT11_PORT->MODER  &= ~(GPIO_MODER_MODER0 << (13 * 2));
+		DHT11_PORT->MODER |= (((uint32_t)GPIO_Mode_IN) << (13 * 2));
+	}
+
+}
+void dht11_begin(void) {
+  // set up the pins!
+
 	GPIO_InitTypeDef  GPIO_InitStructure;
 
 	// GPIOD Periph clock enable
@@ -53,23 +83,14 @@ void set_dir(uint8_t dir){
 
 	// Configure PD12, PD13, PD14 and PD15 in output pushpull mode
 	GPIO_InitStructure.GPIO_Pin = DHT11_PIN;
-	if (dir !=0){
-		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-	}else{
-		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-	}
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
 	GPIO_Init(DHT11_PORT, &GPIO_InitStructure);
 
-}
-void dht11_begin(void) {
-  // set up the pins!
-
-
-  set_dir(0);
-  GPIO_SetBits(DHT11_PORT, DHT11_PIN);
+//  set_dir(0);
+    GPIO_SetBits(DHT11_PORT, DHT11_PIN);
 
   _lastreadtime = 0;
 }
@@ -84,17 +105,17 @@ float dht11_convertCtoF(float c) {
   if (read()) {
     switch (_type) {
     case DHT11:
-      f = data[2];
+      f = dht11_data[2];
       if(S)
       	f = dht11_convertCtoF(f);
       return f;
     case DHT22:
     case DHT21:
-      f = data[2] & 0x7F;
+      f = dht11_data[2] & 0x7F;
       f *= 256;
-      f += data[3];
+      f += dht11_data[3];
       f /= 10;
-      if (data[2] & 0x80)
+      if (dht11_data[2] & 0x80)
 	f *= -1;
       if(S)
 	f = dht11_convertCtoF(f);
@@ -111,13 +132,13 @@ float dht11_readHumidity(void) {
   if (read()) {
     switch (_type) {
     case DHT11:
-      f = data[0];
+      f = dht11_data[0];
       return f;
     case DHT22:
     case DHT21:
-      f = data[0];
+      f = dht11_data[0];
       f *= 256;
-      f += data[1];
+      f += dht11_data[1];
       f /= 10;
       return f;
     }
@@ -151,57 +172,24 @@ sleep_us (int us){
 	{
 	    static struct etimer etimer_dht11;
 
-	    GPIO_SetBits(GPIOD, GPIO_Pin_15);//led
-
 	    // pull the pin high and wait 250 milliseconds
-		set_dir(1);
+		//set_dir(1);
 		GPIO_SetBits(DHT11_PORT, DHT11_PIN);
-		sleep_us(100);
-		GPIO_ResetBits(DHT11_PORT, DHT11_PIN);
-		sleep_us(100);
-		GPIO_SetBits(DHT11_PORT, DHT11_PIN);
-		sleep_us(100);
-		GPIO_ResetBits(DHT11_PORT, DHT11_PIN);
-		sleep_us(100);
-		GPIO_SetBits(DHT11_PORT, DHT11_PIN);
-		sleep_us(100);
-		GPIO_ResetBits(DHT11_PORT, DHT11_PIN);
-		sleep_us(100);
-		GPIO_SetBits(DHT11_PORT, DHT11_PIN);
-		sleep_us(100);
 
-		//delay(250);
-		etimer_set(&etimer_dht11, CLOCK_SECOND / 4);
+		etimer_set(&etimer_dht11, CLOCK_SECOND / 4);//250ms
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer_dht11));
 
-
-		data[0] = data[1] = data[2] = data[3] = data[4] = 0;
+		dht11_data[0] = dht11_data[1] = dht11_data[2] = dht11_data[3] = dht11_data[4] = 0;
 
 		// now pull it low for ~20 milliseconds
-		//set_dir(1);
 		GPIO_ResetBits(DHT11_PORT, DHT11_PIN);
-
-	  //GPIOSetDir(DHT11_PORT, DHT11_PIN,1);//OUTPU
-	  //GPIOSetValue(DHT11_PORT,DHT11_PIN,0 );
-	  //delay(20);
-	  etimer_set(&etimer_dht11, CLOCK_SECOND / 50);
-	  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer_dht11));
-
-	  //cli();
-	  //digitalWrite(_pin, HIGH);
+		Delay(20);
 	  GPIO_SetBits(DHT11_PORT, DHT11_PIN);
 
-	  //GPIOSetValue(DHT11_PORT,DHT11_PIN,1 );
-	  //delayMicroseconds(40);
-//	  etimer_set(&etimer, CLOCK_SECOND / 25);
-//	  PT_WAIT_UNTIL(pt, etimer_expired(&etimer));
-	  sleep_us(40);
-
-	  //pinMode(_pin, INPUT);
-	  set_dir(0);
+	  sleep_us(1);
 
 	  // read in timings
-	  //laststate = GPIOGetValue(DHT11_PORT,DHT11_PIN);
+	  uint32_t counters[85];
 	  laststate = GPIO_ReadInputDataBit(DHT11_PORT,DHT11_PIN);
 	  j=0;
 	  for ( i=0; i< MAXTIMINGS; i++) {
@@ -214,10 +202,11 @@ sleep_us (int us){
 			//PT_WAIT_UNTIL(pt, (GPIOGetValue(DHT11_PORT,DHT11_PIN) != laststate)||etimer_expired(&etimer));
 			counter++;
 			sleep_us(1);
-			if (counter >= 256) {
+			if (counter >= 0xFF) {
 	//			puts("couner mui grande");
 				break;
 			}
+
 		}
 
 		//    laststate = digitalRead(_pin);
@@ -228,9 +217,10 @@ sleep_us (int us){
 		// ignore first 3 transitions
 		if ((i >= 4) && (i%2 == 0)) {
 		  //shove each bit into the storage bytes
-		  data[j/8] <<= 1;
-		  if (counter > 10){
-			  data[j/8] |= 1;
+		  dht11_data[j/8] <<= 1;
+		  counters[j]=counter;
+		  if (counter > 20){
+			  dht11_data[j/8] |= 1;
 			  //GPIOSetValue(2,10,1 );
 		  }else{
 			  //GPIOSetValue(2,10,0 );
@@ -242,14 +232,12 @@ sleep_us (int us){
 
 	  // check we read 40 bits and that the checksum matches
 	  if ((j >= 40) &&
-		  (data[4] == ((data[0] + data[1] + data[2] + data[3]) & 0xFF)) && (data[4]!=0 )) {
+		  (dht11_data[4] == ((dht11_data[0] + dht11_data[1] + dht11_data[2] + dht11_data[3]) & 0xFF)) && (dht11_data[4]!=0 )) {
 
 		  sensors_changed(&DHT11_sensor);
 	  }
-	  set_dir(1);
+	  //set_dir(1);
 	  GPIO_ResetBits(DHT11_PORT, DHT11_PIN);
-
-	  GPIO_ResetBits(GPIOD, GPIO_Pin_15);//led
 
 	  etimer_set(&etimer_dht11, CLOCK_SECOND);
 	  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer_dht11));
@@ -265,10 +253,10 @@ value(int type)
 {
 	if (type== DHT11_SENSOR_HUM)
 	{
-		return data[0];
+		return dht11_data[0];
 	}else if(type == DHT11_SENSOR_TEMP)
 	{
-		return data[2];
+		return dht11_data[2];
 	}else{
 		return 0;
 	}

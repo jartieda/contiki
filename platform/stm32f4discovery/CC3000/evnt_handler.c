@@ -480,6 +480,7 @@ hci_unsol_event_handler(char *event_hdr)
             case HCI_EVNT_DATA_UNSOL_FREE_BUFF:
             {
                 hci_event_unsol_flowcontrol_handler(event_hdr);
+		 	 	tSLInformation.sWlanCB(HCI_EVNT_DATA_UNSOL_FREE_BUFF, NULL, 0);
 
                 if (tSLInformation.NumberOfReleasedPackets==tSLInformation.NumberOfSentPackets)
                 	    {

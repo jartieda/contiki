@@ -551,6 +551,14 @@ void OV2640_Init(ImageFormat_TypeDef ImageFormat) {
 		break;
 	}
 	}
+	DCMI_ITConfig(DCMI_IT_FRAME, ENABLE);
+	NVIC_InitTypeDef NVIC_InitStructure;
+	NVIC_InitStructure.NVIC_IRQChannel = DCMI_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
 }
 
 /**
