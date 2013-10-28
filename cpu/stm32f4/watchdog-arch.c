@@ -67,12 +67,10 @@ watchdog_init(void)
 	                          = LsiFreq/128
 	   */
 
-	  IWDG_SetReload(SystemCoreClock/16);//2 seg
+	  IWDG_SetReload(SystemCoreClock/8);//2 seg
 
 	  /* Reload IWDG counter */
 	  IWDG_ReloadCounter();
-
-
 
 }
 /*---------------------------------------------------------------------------*/

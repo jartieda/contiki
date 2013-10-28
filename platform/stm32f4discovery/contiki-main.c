@@ -22,6 +22,11 @@
 //#include "dcmi_ov9655.h"
 #include "dcmi_ov2640.h"
 #include "socket.h"
+#include "leds.h"
+
+#define GPIO_HIGH(a,b) 		a->BSRRL = b
+#define GPIO_LOW(a,b)			a->BSRRH = b
+#define GPIO_TOGGLE(a,b) 	a->ODR ^= b
 
 extern int e_sprintf(char *out, const char *format, ...);
 
@@ -73,7 +78,7 @@ main()
 
   int i = 0;
   for (i = 0 ; i<19200; i++)
-      frame_buffer[i]=0;
+      frame_buffer[i]=i%256;
 
   /* Initializes the DCMI interface (I2C and GPIO) used to configure the camera */
   OV2640_HW_Init();
@@ -260,6 +265,7 @@ hum
               //
               for (ipkg = 0; ipkg < 32; ipkg++)
               {
+            	  GPIO_TOGGLE(GPIOD, GPIO_Pin_14);
                   send(sd, frame_buffer+(ipkg*1200),1200, 0);
                   //etimer_reset(&timer_send_packet);
                   watchdog_periodic();
