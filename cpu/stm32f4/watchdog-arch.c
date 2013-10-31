@@ -57,17 +57,17 @@ watchdog_init(void)
 	  IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);
 
 	  /* IWDG counter clock: LSI/32 */
-	  IWDG_SetPrescaler(IWDG_Prescaler_32);
+	  IWDG_SetPrescaler(IWDG_Prescaler_64);
 
 	  /* Set counter reload value to obtain 250ms IWDG TimeOut.
-	     IWDG counter clock Frequency = LsiFreq/32
+	     IWDG counter clock Frequency = LsiFreq/64
 	     Counter Reload Value = 250ms/IWDG counter clock period
-	                          = 0.25s / (32/LsiFreq)
-	                          = LsiFreq/(32 * 4)
-	                          = LsiFreq/128
+	                          = 0.25s / (64/LsiFreq)
+	                          = LsiFreq/(64 * 4)
+	                          = LsiFreq/256
 	   */
 
-	  IWDG_SetReload(SystemCoreClock/8);//2 seg
+	  IWDG_SetReload(SystemCoreClock);//
 
 	  /* Reload IWDG counter */
 	  IWDG_ReloadCounter();

@@ -85,6 +85,7 @@ main()
   Delay(5);/*necessary for init camera */
   /* Read the OV9655/OV2640 Manufacturer identifier */
   OV2640_ReadID(&OV2640_Camera_ID);
+  GPIO_SetBits(GPIOD, GPIO_Pin_12);
 
   if(OV2640_Camera_ID.PIDH  == 0x26)
   {
@@ -132,7 +133,7 @@ main()
 		}
     	watchdog_periodic();
 		etimer_request_poll();
-
+		process_poll(&wifi_client_process);
     } while(process_run() > 0);
     idle_count++;
     /* Idle! */
@@ -260,7 +261,7 @@ hum
               //etimer_set(&timer_send_packet, CLOCK_SECOND * 3);
               //image divided in 16 packets of 1200: 16 = 160 *120 /1200
               //PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
-              PROCESS_WAIT_EVENT_UNTIL(tSLInformation.usNumberOfFreeBuffers>4);
+              PROCESS_YIELD_UNTIL(tSLInformation.usNumberOfFreeBuffers>5);
 			  //freebuff=0;
               //
               for (ipkg = 0; ipkg < 32; ipkg++)
@@ -269,7 +270,7 @@ hum
                   send(sd, frame_buffer+(ipkg*1200),1200, 0);
                   //etimer_reset(&timer_send_packet);
                   watchdog_periodic();
-                  PROCESS_WAIT_EVENT_UNTIL(tSLInformation.usNumberOfFreeBuffers>4);
+                  PROCESS_YIELD_UNTIL(tSLInformation.usNumberOfFreeBuffers>5);
                   freebuff=0;
 
               }
@@ -326,7 +327,7 @@ Windspeed=%03d&Winddirection=%03d&pira=%03d&temp=%03d&hum=%03d\n",sensor_payload
               send(sd, sensor_buff, strlen(sensor_buff)	, 0);
               etimer_set(&timer_send_packet, CLOCK_SECOND * 2);
               PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
-              PROCESS_WAIT_EVENT_UNTIL(tSLInformation.usNumberOfFreeBuffers>4);
+              PROCESS_YIELD_UNTIL(tSLInformation.usNumberOfFreeBuffers>5);
           }
           closesocket(sd);
       }
