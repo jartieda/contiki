@@ -3,6 +3,7 @@
 #include <stm32f4xx_spi.h>
 #include "stm32f4xx_conf.h"
 #include <contiki.h>
+#include "hci.h"
 
 /*---------------------------------------------------------------------------*/
 
@@ -18,6 +19,7 @@ int ubTxMax=0;
 uint8_t wifi_state=3;//0 tx, 1 rx header, 2 rx body , 3 tx Init;
 
 uint8_t wifi_dhcp = 0;
+uint8_t freebuff = 0;
 
 void (*_pfRxHandler)();
 /* The SpiOpen function is called from the wlan_start API function. The main  */
@@ -29,7 +31,7 @@ void SpiOpen(void (*pfRxHandler))
 	_pfRxHandler = pfRxHandler;
 
 	GPIO_InitTypeDef GPIO_InitStructure;
-	GPIO_StructInit(&GPIO_InitStructure);
+
 	/*!< Enable the SPI clock */
 	WIFI_SPI_CLK_INIT(WIFI_SPI_CLK, ENABLE);
 
@@ -64,7 +66,6 @@ void SpiOpen(void (*pfRxHandler))
 	GPIO_Init(WIFI_SPI_MISO_GPIO_PORT, &GPIO_InitStructure);
 
 	/*!< Configure WIFI Card CS pin in output pushpull mode ********************/
-	GPIO_StructInit(&GPIO_InitStructure);
 	GPIO_InitStructure.GPIO_Pin = WIFI_CS_PIN;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
@@ -152,7 +153,6 @@ void SpiOpen(void (*pfRxHandler))
 
 	// Configure wifi_pwr_en on PD9
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-	GPIO_StructInit(&GPIO_InitStructure);
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
@@ -408,9 +408,29 @@ void  SpiResumeSpi(void)
 
 void fWlanCB(long event_type, char * data, unsigned char length )
 {
-	if (event_type == 0x8010)//DHCP
+	if (event_type == HCI_EVNT_WLAN_UNSOL_DHCP)//DHCP
 	{
 		wifi_dhcp = 1;
+	}else
+	if (event_type == HCI_EVNT_DATA_UNSOL_FREE_BUFF)
+	{
+		freebuff = 1;
+	}else
+	if (event_type == 0x1081)//DHCP
+	{
+		//freebuff = 1;
+	}else if (event_type == HCI_EVENT_CC3000_CAN_SHUT_DOWN)//DHCP
+	{
+		//freebuff = 1;
+	}else if (event_type == HCI_EVNT_WLAN_ASYNC_SIMPLE_CONFIG_DONE)
+	{
+		GPIO_SetBits(GPIOE, GPIO_Pin_12);
+
+		wlan_ioctl_set_connection_policy(DISABLE, DISABLE, ENABLE);
+		wlan_stop();
+		wlan_start();
+	}else if (event_type != HCI_EVNT_WLAN_KEEPALIVE){
+		freebuff = 0;
 	}
 }
 
@@ -451,6 +471,45 @@ void fWriteWlanPin(unsigned char val)
 	else{
 		GPIO_ResetBits(WIFI_CS_GPIO_PORT, WIFI_CS_PIN);
 	}
+}
+/**
+ * @brife Configures smart config button (connected to PC3 pin) in interrupt mode
+ *
+ */
+void SmartConfigButton(void)
+{
+
+	  EXTI_InitTypeDef   EXTI_InitStructure;
+	  GPIO_InitTypeDef   GPIO_InitStructure;
+	  NVIC_InitTypeDef   NVIC_InitStructure;
+
+	  /* Enable GPIOA clock */
+	  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+	  /* Enable SYSCFG clock */
+	  RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+	  /* Configure PA0 pin as input floating */
+	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
+	  GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+	  /* Connect EXTI Line0 to PA0 pin */
+	  SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource3);
+
+	  /* Configure EXTI WiFi */
+	  EXTI_InitStructure.EXTI_Line = EXTI_Line3;
+	  EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	  EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+	  EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	  EXTI_Init(&EXTI_InitStructure);
+
+	  /* Enable and set EXTI Line0 Interrupt to the lowest priority */
+	  NVIC_InitStructure.NVIC_IRQChannel = EXTI3_IRQn ;
+	  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
+	  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
+	  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	  NVIC_Init(&NVIC_InitStructure);
 }
 
 /**
@@ -494,7 +553,17 @@ void EXTILine_Config(void)
 }
 
 /*---------------------------------------------------------------------------*/
-
+/**
+ *  @brief This function handles External line 3 interrupt request for smart config button
+ */
+//void EXTI3_IRQHandler(void)
+//{
+//	if(EXTI_GetITStatus(EXTI_Line3) != RESET)
+//	{
+//		/* Clear the EXTI line 0 pending bit */
+//		EXTI_ClearITPendingBit(EXTI_Line3);
+//	}
+//}
 /**
   * @brief  This function handles External line 0 interrupt request.
   * @param  None
@@ -504,8 +573,6 @@ void EXTI9_5_IRQHandler(void)
 {
   if(EXTI_GetITStatus(EXTI_Line8) != RESET)
   {
-    /* Set LED */
-	  GPIO_SetBits(GPIOE, GPIO_Pin_12);
 	  SpiReceive(wlan_rx_buffer);
     /* Clear the EXTI line 0 pending bit */
     EXTI_ClearITPendingBit(EXTI_Line8);
