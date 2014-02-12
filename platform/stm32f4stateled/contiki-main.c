@@ -18,9 +18,11 @@
 #include "utils.h"
 #include "CC3000/wlan.h"
 #include "CC3000/spi.h"
+#include "CC3000/nvmem.h"
+#include "CC3000/security.h"
 #include "socket.h"
 #include "RGBled.h"
-
+#include "ssd1306.h"
 
 PROCINIT(&etimer_process );
 
@@ -59,13 +61,41 @@ main()
 
   //watchdog_start();
 
+  ssd1306Init();
+  int kk=1;
+  while (1){
+	  for (int jj = 0; jj<128; jj++){
+		  for (int ii =0; ii<64;ii++){
+			  if (jj%kk ==0) ssd1306ClearPixel(jj,ii);
+			  else 		     ssd1306DrawPixel(jj, ii);
+		  }
+	  }
+	  kk++;
+	  if (kk > 30) kk = 1;
+	  ssd1306Refresh();
+  }
   /* Initializate the WIFI */
   wlan_start(0);
-  wlan_connect (WLAN_SEC_WPA2 ,"wifi1",5,NULL,"smallsignals",12);
+  unsigned char patchVer[10];
+  nvmem_read_sp_version(patchVer);
+  if (! GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_3) )
+  {
+	  nvmem_create_entry(NVMEM_AES128_KEY_FILEID, AES128_KEY_SIZE);
+	  //wlan_first_time_config_start();
+	  aes_write_key("1234567890123456");
+	  wlan_smart_config_set_prefix("TTT");
+	  wlan_smart_config_start(0);
 
+		GPIO_SetBits(GPIOE, GPIO_Pin_10);
+
+  }else{
+	  //wlan_connect (WLAN_SEC_WPA2 ,"MOVISTAR_E22F",13,NULL,"EvtRYfsVPxtLfsNm2TLP",20);
+  }
   while(wifi_dhcp == 0){
 	  Delay(100);
   }
+	GPIO_ResetBits(GPIOE, GPIO_Pin_10);
+	GPIO_ResetBits(GPIOE, GPIO_Pin_12);
 
   autostart_start(autostart_processes);
 
@@ -77,8 +107,6 @@ main()
 			clocktime=clock_seconds();
 
 	          brightness+=10;
-
-
 
 	    	if (clocktime%2==0){
 	    		GPIO_SetBits(GPIOE, GPIO_Pin_10);
@@ -127,6 +155,20 @@ void init() {
 	PWR_WakeUpPinCmd(DISABLE);
 
 	RGBled_init();
+
+	GPIO_InitTypeDef   GPIO_InitStructure2;
+
+	/* Enable GPIOA clock */
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+	/* Enable SYSCFG clock */
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+	/* Configure PA0 pin as input floating */
+	GPIO_InitStructure2.GPIO_Mode = GPIO_Mode_IN;
+	GPIO_InitStructure2.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure2.GPIO_Pin = GPIO_Pin_3;
+	GPIO_Init(GPIOC, &GPIO_InitStructure2);
+
 	/*RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 	// State Leds
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1| GPIO_Pin_2;
@@ -212,7 +254,7 @@ Content-Length: 0\n\
 //              for (ipkg = 0; ipkg < 32; ipkg++)
 //              {
 //                  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
-//       //           send(sd, frame_buffer+(ipkg*1200),1200, 0);
+//       //         send(sd, frame_buffer+(ipkg*1200),1200, 0);
 //                  etimer_reset(&timer_send_packet);
 //              }
 

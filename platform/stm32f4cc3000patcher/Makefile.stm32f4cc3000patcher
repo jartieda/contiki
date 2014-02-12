@@ -13,8 +13,8 @@ endif
 CONTIKI_TARGET_SOURCEFILES += $(SENSORS) $(STEPPER_ROBOT) \
  $(CODEPROP_SOURCES) $(CONTIKI_TARGET_MAIN) \
 	cc3000_common.c hci.c nvmem.c socket.c \
-	evnt_handler.c netapp.c os.c wlan.c spi.c pressure.c \
-	dcmi_ov2640.c camera_api.c dht11.c windsensor.c sensors.c leds-arch.c leds.c printf.c
+	evnt_handler.c netapp.c os.c wlan.c spi.c security.c leds-arch.c leds.c RGBled.c\
+	
 
 # include $(CONTIKI)/platform/$(TARGET)/apps/Makefile.apps
 

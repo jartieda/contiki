@@ -281,7 +281,7 @@ long SpiReceive(unsigned char *pUserBuffer)
 
 //	WIFI_CS_HIGH();
 
-//  EXTI_ClearITPendingBit(EXTI_Line8);
+//    EXTI_ClearITPendingBit(EXTI_Line8);
 //	fWlanInterruptEnable();
 
 	return 0;//FIXME THIS RETURNED COUNT
@@ -408,18 +408,18 @@ void  SpiResumeSpi(void)
 
 void fWlanCB(long event_type, char * data, unsigned char length )
 {
-	if (event_type == HCI_EVNT_WLAN_UNSOL_DHCP)//DHCP
+	if (event_type == 0x8010)//DHCP
 	{
 		wifi_dhcp = 1;
 	}else
-	if (event_type == HCI_EVNT_DATA_UNSOL_FREE_BUFF)
+	if (event_type == 0x4100)//DHCP
 	{
 		freebuff = 1;
 	}else
 	if (event_type == 0x1081)//DHCP
 	{
 		//freebuff = 1;
-	}else if (event_type == HCI_EVENT_CC3000_CAN_SHUT_DOWN)//DHCP
+	}else if (event_type == 0x99)//DHCP
 	{
 		//freebuff = 1;
 	}else if (event_type == HCI_EVNT_WLAN_ASYNC_SIMPLE_CONFIG_DONE)
@@ -429,7 +429,7 @@ void fWlanCB(long event_type, char * data, unsigned char length )
 		wlan_ioctl_set_connection_policy(DISABLE, DISABLE, ENABLE);
 		wlan_stop();
 		wlan_start();
-	}else if (event_type != HCI_EVNT_WLAN_KEEPALIVE){
+	}else if (event_type != 0x8200){
 		freebuff = 0;
 	}
 }

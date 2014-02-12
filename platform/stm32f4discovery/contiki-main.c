@@ -23,6 +23,7 @@
 #include "dcmi_ov2640.h"
 #include "socket.h"
 #include "leds.h"
+#include "pressure.h"
 
 #define GPIO_HIGH(a,b) 		a->BSRRL = b
 #define GPIO_LOW(a,b)			a->BSRRH = b
@@ -32,7 +33,7 @@ extern int e_sprintf(char *out, const char *format, ...);
 
 PROCINIT(&etimer_process );
 
-SENSORS(&DHT11_sensor, &wind_sensor);
+SENSORS(&DHT11_sensor, &wind_sensor, &PRESSURE_sensor);
 
 PROCESS(wifi_client_process, "wifi_client_process");
 
@@ -52,8 +53,95 @@ uint32_t clocktime;
 //#define WIFI_BOARD
 #define CAMERA_BOARD
 //#define DISCOVERY_BOARD
+volatile int servo_angle=0; // +/- 90 degrees, use floats for fractional
+
+void TIM1_UP_TIM10_IRQHandler(void)
+{
+  if (TIM_GetITStatus(TIM1, TIM_IT_Update) != RESET)
+  {
+
+    // minimum high of 600 us for -90 degrees, with +90 degrees at 2400 us, 10 us per degree
+    //  timer timebase set to us units to simplify the configuration/math
+	  GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+	  //GPIO_ToggleBits(GPIOE, GPIO_Pin_9);
+
+    TIM1->CCR1 = 600 + ((servo_angle + 90) * 10); // where angle is an int -90 to +90 degrees, PC.6
+    TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
+  }
+}
+void SERVO_Configuration(void)
+{
+
+	GPIO_InitTypeDef GPIO_InitStructure;
+	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
+	TIM_OCInitTypeDef TIM_OCInitStructure;
+
+	/* TIM1 clock enable */
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
+
+	/* GPIOE clock enable */
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
+
+	/* TIM1 channel 2 pin (PE.9) configuration */
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOE, &GPIO_InitStructure);
+
+	/* Connect TIM pins to AF2 */
+	GPIO_PinAFConfig(GPIOE, GPIO_PinSource9, GPIO_AF_TIM1);
+
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+	/* Configure the NVIC Preemption Priority Bits */
+	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_0);
+	/* Enable the TIM1 Interrupt */
+	NVIC_InitStructure.NVIC_IRQChannel = TIM1_UP_TIM10_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+    // Simplify the math here so TIM_Pulse has 1 us units
+
+    // Use (24-1) for VL @ 24 MHz
+    // Use (72-1) for STM32 @ 72 MHz
+
+    TIM_TimeBaseStructure.TIM_Prescaler = 168 - 1;  // 24 MHz / 24 = 1 MHz
+    TIM_TimeBaseStructure.TIM_Period = 20000 - 1; // 1 MHz / 20000 = 50 Hz (20 ms)
+    TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
+    // Set up 4 channel servo
+    TIM_OCStructInit (& TIM_OCInitStructure);
+    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+    TIM_OCInitStructure.TIM_OutputNState = TIM_OutputNState_Disable;
+    TIM_OCInitStructure.TIM_Pulse = 600 + 900; // 1500 us - Servo Top Centre
+    TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
+    TIM_OC1Init(TIM1, &TIM_OCInitStructure);    // Channel 1 configuration = PC.06 TIM3_CH1
+
+    // PWM1 Mode configuration: Channel1
+    // Edge -aligned; not single pulse mode
+    TIM_OCStructInit (& TIM_OCInitStructure);
+    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+    TIM_OC1Init(TIM1 , &TIM_OCInitStructure);
+
+    TIM_BDTRInitTypeDef bdtr;
+    TIM_BDTRStructInit(&bdtr);
+    bdtr.TIM_AutomaticOutput = TIM_AutomaticOutput_Enable;
+    TIM_BDTRConfig(TIM1, &bdtr);
 
 
+    // Enable Timer Interrupt and Timer
+    TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE); //
+    TIM_Cmd(TIM1 , ENABLE);
+
+    TIM_SetCompare1(TIM1, 1500);    // 2370 = 1.5ms - for Servo
+
+}
 // Private function prototypes
 void Delay(volatile uint32_t nCount);
 void init();
@@ -75,6 +163,8 @@ main()
   process_init();
   process_start(&etimer_process, NULL);
   autostart_start(autostart_processes);
+
+  SERVO_Configuration();
 
   int i = 0;
   for (i = 0 ; i<19200; i++)
@@ -109,10 +199,14 @@ main()
 
   /* Initializate the WIFI */
   wlan_start(0);
-  wlan_connect (WLAN_SEC_WPA2 ,"wifi1",5,NULL,"smallsignals",12);
+//  wlan_connect (WLAN_SEC_WPA2 ,"wifi1",5,NULL,"smallsignals",12);
+  wlan_connect (WLAN_SEC_WEP ,"WLAN_75",7,NULL,"Z0002CFA92E75",13);
 
   while(wifi_dhcp == 0){
-	  Delay(100);
+	  GPIO_SetBits(GPIOD, GPIO_Pin_12);
+	  Delay(300);
+	  GPIO_ResetBits(GPIOD, GPIO_Pin_12);
+	  Delay(300);
   }
 
   process_start(&sensors_process,NULL);
@@ -127,8 +221,10 @@ main()
 			clocktime=clock_seconds();
 	    	if (clocktime%2==0){
 	    		GPIO_SetBits(GPIOD, GPIO_Pin_15);
+	    		servo_angle=-45;
 	    	}else{
 	    		GPIO_ResetBits(GPIOD, GPIO_Pin_15);
+	    		servo_angle=45;
 	    	}
 		}
     	watchdog_periodic();
@@ -316,14 +412,15 @@ hum
               itoa(wind, s_win);
               char s_dir[5];
 			  itoa(wdir, s_dir);*/
-              sensor_payload_leng= 62;
+              sensor_payload_leng= 72;
               /*itoa(sensor_payload_leng, content_length );
               strcpy(&sensor_buff[196],content_length);
               strcpy(&sensor_buff[200],"\n\n");
               strcpy(&sensor_buff[200])*/
               e_sprintf(&sensor_buff[170], "%d\n\
 \n\
-Windspeed=%03d&Winddirection=%03d&pira=%03d&temp=%03d&hum=%03d\n",sensor_payload_leng, wind,wdir,rad, temp,hum );
+Windspeed=%03d&Winddirection=%03d&pira=%03d&temp=%03d&hum=%03d&pres=%04d\n",
+                   sensor_payload_leng, wind,wdir,rad, temp,hum, PRESSURE_decPcomp);
               send(sd, sensor_buff, strlen(sensor_buff)	, 0);
               etimer_set(&timer_send_packet, CLOCK_SECOND * 2);
               PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer_send_packet));
